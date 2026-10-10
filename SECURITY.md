@@ -1,39 +1,35 @@
-# 🔒 安全说明
+# 🔐 安全与隐私说明
 
-本项目的目标是：**在不取得 Epic / Steam 登录信息的情况下，发现免费游戏并用 Bark 通知你**。
+FreeGame Radar 使用公开游戏促销信息，不需要 Epic Games、Steam 或其他游戏平台的账号密码、Cookie、验证码或登录 Token。
 
-## 不应提交到 GitHub 的资料
+## 敏感信息管理
 
-- Bark 设备密钥与推送 URL（例如完整 `https://api.day.app/...`）。
-- ntfy 随机主题名（不应发布于公开代码；公共 ntfy 主题默认没有强制身份验证）。
-- Epic / Steam 账号密码、浏览器 Cookie、Token、短信验证码、备用码。
-- 自建 Bark 服务器密码及其他服务的 API Key。
+- 将 Bark 推送地址保存为 GitHub Actions Secret：`BARK_URL`。
+- Android ntfy 主题建议生成高随机度名称，并保存为 Secret：`NTFY_TOPIC`。
+- 不要把真实密钥放进 README、源码、普通 Variables、Issue、Pull Request、评论、Actions 日志或截图。
+- 推荐定期检查依赖与 Actions 工作流变动，避免在不可信的代码中暴露 Secrets。
 
-请将 Bark URL 保存为 **Repository Secret**：`BARK_URL`；安卓 ntfy 主题保存为 `NTFY_TOPIC`。**不要**把它写入 README、普通 Variables、Issue、Discussion、Pull Request、Actions 日志或截图中。
+## 推送机制
 
-## 密钥泄露如何处理
+- 未设置任何通知 Secret 时，只更新免费游戏列表，不发送推送。
+- Bark 通知通过 HTTPS 请求发送到 Bark 服务器。
+- Android ntfy 仅在工作流中取消两处 `NTFY_TOPIC` 注释，并设置对应 Secret 后启用。
+- 公共 `ntfy.sh` 主题通常不具备强制访问控制；知道主题名的其他人可能订阅或发送消息，**不要通过公共主题发送私密信息**。
+- 项目通知内容仅包含公开的游戏活动信息。
 
-如果 Bark Key 曾贴在公开页面或聊天内容中：
+## 密钥泄露处理
 
-1. 在 Bark 端更换或撤销旧密钥（以所用 Bark 服务支持的管理方式为准）。
-2. 更新 GitHub Actions Secret `BARK_URL`。
-3. 用 Actions 的 `test` 模式确认新密钥可用。
-4. 若密钥曾写入 Git 提交，删除工作树中的明文并清理 Git 历史中敏感信息；**不要认为删掉最新版本就意味着泄露已消除**。
-
-## 依赖和网络边界
-
-- 本项目无外部 pip 依赖，使用 Python 标准库。
-- GitHub Actions 在 GitHub 托管的运行环境中执行；该环境内的脚本**会读取** `BARK_URL` 或 `NTFY_TOPIC`，用于向推送服务发送通知。
-- 免费的公共 `ntfy.sh` 主题默认没有身份验证；知道主题的人可能查看或发送此主题通知。不要用它来传输私密数据。
-- 仓库 Actions 工作流可以修改时，应特别审查后续对 `radar.py` 和 workflow 文件的提交。
-- 数据请求依赖 Epic 公开促销接口及 GamerPower API；上游信息可能有误或延迟。
+1. 在对应服务端更换或撤销已暴露的密钥。
+2. 更新 GitHub 仓库中的相应 Secret。
+3. 检查公开文件、日志与提交记录是否含敏感信息。
+4. 如果密钥已写入 Git 提交，不能仅靠删除文件最新版来消除历史泄露；应按 GitHub 官方安全指引处理仓库历史。
 
 ## 漏洞报告
 
-请不要在公开 Issue 中分享任何实际密码、Token、Cookie 或密钥。可以先发起一个不含敏感信息的 Issue 描述问题类型，并使用 GitHub 支持的私密报告途径与维护者沟通具体细节（如仓库启用了私密漏洞报告）。
+请通过不包含敏感信息的 [GitHub Issue](https://github.com/EpochTX/freegame/issues) 说明可复现问题。若需要分享安全敏感细节，请优先使用 GitHub 提供的私密漏洞报告渠道（若仓库已启用）；切勿在公开 Issue 中发布凭证。
 
-## 使用声明
+## 免责声明
 
-本项目与 Epic Games、Valve/Steam、GamerPower、Bark 无官方关联；不得用它来规避平台验证机制或批量滥用福利。
+本项目与 Epic Games、Valve / Steam、GamerPower、Bark、ntfy 无官方关联。使用本项目应遵守游戏平台及数据源的服务条款。
 
-[← 返回项目首页](./README.md)
+[← 返回 README](./README.md)
