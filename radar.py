@@ -296,11 +296,11 @@ def game_fingerprint(game: dict) -> str:
     """
     title = unicodedata.normalize("NFKC", str(game.get("title") or "")).casefold()
     title = re.sub(
-        r"(?:\\s*\\((?:steam|epic(?: games store)?)\\))?\\s*(?:key\\s*)?(?:giveaway|free game)\\s*$",
+        r"(?:\s*\((?:steam|epic(?: games store)?)\))?\s*(?:key\s*)?(?:giveaway|free game)\s*$",
         "", title,
     )
-    title = re.sub(r"\\s*\\((?:steam|epic(?: games store)?)\\)\\s*$", "", title)
-    name = re.sub(r"[^\\w]+", "-", title, flags=re.UNICODE).strip("-")
+    title = re.sub(r"\s*\((?:steam|epic(?: games store)?)\)\s*$", "", title)
+    name = re.sub(r"[^\w]+", "-", title, flags=re.UNICODE).strip("-")
     if not name:
         name = str(game.get("id", "unknown"))
     return f"game:{str(game.get('platform', '')).casefold()}:{name}"
