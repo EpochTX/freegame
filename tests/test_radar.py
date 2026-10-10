@@ -93,10 +93,31 @@ class RadarTests(unittest.TestCase):
                 self.assertIn("bark:" + radar.game_fingerprint(game), json.loads(radar.SENT_FILE.read_text()))
                 self.assertTrue(radar.OUTPUT_FILE.exists())
 
-    def test_no_bark_secret_does_not_mark_sent(self):
-        with patch.dict(os.environ, {"BARK_URL": ""}):
-            with self.assertRaises(RuntimeError):
+    def test_no_push_secret_still_updates_free_games(self):
+        game = {"id": "epic:zero-channel", "platform": "Epic",
+                "title": "No Push Needed",
+                "url": "https://store.epicgames.com/p/no-push",
+                "end": "2026-10-16T15:00:00Z", "note": "Test"}
+        with tempfile.TemporaryDirectory() as temp:
+            sent_path = Path(temp) / "data" / "sent.json"
+            current_path = Path(temp) / "data" / "current.json"
+            md_path = Path(temp) / "FREE_GAMES.md"
+            with (
+                patch.object(radar, "SENT_FILE", sent_path),
+                patch.object(radar, "CURRENT_FILE", current_path),
+                patch.object(radar, "OUTPUT_FILE", md_path),
+                patch.object(radar, "collect_games", return_value=([game], [])),
+                patch.object(radar, "bark_notify") as bark,
+                patch.object(radar, "ntfy_notify") as ntfy,
+                patch.dict(os.environ, {"BARK_URL": "", "NTFY_TOPIC": ""}),
+            ):
                 radar.scan()
+                self.assertTrue(md_path.exists())
+                self.assertIn("No Push Needed", md_path.read_text())
+                self.assertEqual(json.loads(current_path.read_text()), [game])
+                self.assertEqual(json.loads(sent_path.read_text()), {})
+                bark.assert_not_called()
+                ntfy.assert_not_called()
 
     def test_bark_json_and_url(self):
         class FakeResponse:
