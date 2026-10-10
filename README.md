@@ -38,7 +38,7 @@
 | :--- | :---: | :--- |
 | 🎮 Epic 限时免费 | ✅ | 根据 Epic 公开促销接口筛选“原价大于 0、当前 0 元且促销有效”的商品 |
 | 🚂 Steam 赠送活动 | ✅ | 读取 GamerPower 的 Steam 活动列表；可能包含第三方领码活动 |
-| 📲 Bark 手机推送 | ✅ | 新活动通知附带直达链接 |
+| 📲 Bark 手机推送 | ✅ | 展示真实游戏名称、北京时间截止信息（Epic）与领取链接 |
 | ⏰ 定时监控 | ✅ | 默认每 6 小时一次，可手动运行 |
 | 🔁 自动去重 | ✅ | 按活动 ID 记录已通知项目，避免每次重复轰炸 |
 | 🧪 一键测试 | ✅ | 无需查询游戏即可先测试 Bark |
@@ -66,6 +66,8 @@
 | **Secret** | Bark App 提供的完整 HTTPS 推送 URL，如 `https://api.day.app/YOUR_DEVICE_KEY/` |
 
 > 🔐 **不要**把真实 Bark Key、账号密码、Cookie、Token 填入源码、README、Issue 或 Actions Variables。请放在 **Secrets** 中。曾公开过的 Key 应先在 Bark 中轮换。
+
+> 🕒 **历史消息不再短时过期：** 推送时使用 `isArchive=1` 且不设置 `ttl`。如果你从 Bark 的示例命令复制了 `/title/body?group=example&ttl=600`，请把 Secret 更正为**仅含设备密钥**的完整 HTTPS 地址（`https://api.day.app/YOUR_DEVICE_KEY/`）；脚本也会自动去除这类误带的示例参数。最终历史保留仍受 Bark App 数据和清理设置影响。
 
 ### 3. 测试是否收到通知
 
