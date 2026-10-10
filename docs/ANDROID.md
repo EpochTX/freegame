@@ -1,105 +1,83 @@
-# 🤖 安卓接入指南：ntfy
+# 📲 Android 推送接入：ntfy
 
-免费游戏雷达支持两个独立的通知渠道：
+FreeGame Radar 默认可直接扫描并更新免费游戏列表，**安卓通知为可选功能**。需要安卓推送时，可使用开源 [ntfy](https://github.com/binwiederhier/ntfy) 服务，无需单独部署服务器。
 
-- iPhone：**Bark**（`BARK_URL`）。
-- Android：**ntfy**（`NTFY_TOPIC`）。
+> 默认不开启 ntfy。仅设置 GitHub Secret 还不够，需要在工作流中取消两处注释。
 
-**本仓库当前完全停用：Bark 和 ntfy 均不运行，GitHub Actions 也不执行。** 完整工作流保存在 [`templates/radar.yml`](../templates/radar.yml)，其事件块已注释。未来使用者需要先恢复工作流，再根据设备启用 Bark 或 ntfy；不需要部署服务器或提供游戏账号 Cookie。
+## 1. 安装 ntfy App
 
-## 1. 安装 ntfy
+- 官方文档：[ntfy Android 推送](https://docs.ntfy.sh/subscribe/phone/)
+- 安装途径：Google Play 或 F-Droid。
+- 开启通知权限，并确认手机网络可以访问 `ntfy.sh`。
 
-官方项目：[ntfy](https://github.com/binwiederhier/ntfy) · [Android 客户端说明](https://docs.ntfy.sh/subscribe/phone/)
+使用 F-Droid 版本可能需要保持后台连接；Android 的电池优化或后台管理规则可能影响实时收信。
 
-Android 应用可通过 Google Play 或 F-Droid 安装。打开 App 后允许通知权限。
+## 2. 创建随机主题
 
-- Google Play 版本通常借助 FCM 处理推送；请确保设备具备可用的相关服务。
-- F-Droid 版本可使用后台连接，不依赖 Google 服务；可能更耗电，需注意国产系统的后台限制。
-- 使用公共服务 `ntfy.sh` 需要设备能连接该域名；具体取决于网络环境。
+公共 `ntfy.sh` 服务上的主题默认没有账号访问控制；**知道主题名的人可能订阅或发送通知**。请使用随机且不可预测的主题，避免手机号或常见单词。
 
-## 2. 生成一个不容易被猜到的主题名
-
-ntfy 公共服务器上的主题**默认没有访问控制**，任何知道主题名的人都可能订阅和发送消息，所以**千万不要用** `games`、`freegame`、手机号等简单名称。
-
-可在电脑终端运行以下命令生成随机主题（只是生成字符串，不联网）：
+可在电脑上运行：
 
 ```bash
 python -c "import secrets; print('freegame_' + secrets.token_urlsafe(24))"
 ```
 
-得到类似 `freegame_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX` 的随机值，**不要公开分享或提交到仓库**。
+得到一串如 `freegame_RANDOM_TOPIC_FROM_GENERATOR` 的名称。该示例是占位文字，不可直接当作密钥使用。
 
-> ntfy 的随机主题不等于真正的端到端加密。适合推送公开游戏信息；如需保护隐私，应使用有访问控制的服务器。
+在 ntfy App 里点击 **Subscribe to topic**，服务器选 `ntfy.sh`，填入生成的完整主题名。
 
-## 3. 在安卓订阅主题
+## 3. 添加 GitHub Secret
 
-1. 打开 ntfy App → 点击新增订阅（**Subscribe to topic**）。
-2. 服务器保持 `ntfy.sh`。
-3. 输入你生成的**完整主题名**并订阅。
-4. 允许后台通知；必要时解除系统对 ntfy 的省电限制。
+在自己仓库的 **Settings → Secrets and variables → Actions → New repository secret** 中创建：
 
-同一个主题可以在多台安卓设备订阅，便于同步接收，但所有持有主题的人也可能收到消息。
-
-## 4. GitHub 设置 Secret
-
-打开自己的 GitHub 仓库：
-
-**Settings → Secrets and variables → Actions → New repository secret**
-
-填写：
-
-| 字段 | 内容 |
+| 参数 | 填写值 |
 | --- | --- |
 | Name | `NTFY_TOPIC` |
-| Secret | 刚才生成的**主题名本身**，不要带 `https://ntfy.sh/` |
+| Secret | 生成的随机主题名，不加 `https://ntfy.sh/` |
 
-如果你之前已经配置了 Bark，请保留 `BARK_URL`：两台设备启用后会分别接收同一批活动通知。**仅新增 Secret 不会开启安卓推送，仍需下一步取消注释。**
+不要把真实主题写进 `.yml`、README、Issue、Pull Request 或公开日志中。
 
-仓库入口：[freegame Secrets](https://github.com/EpochTX/freegame/settings/secrets/actions)
+## 4. 启用两处配置注释
 
-## 5. 恢复工作流并取消两处 ntfy 注释（必做）
+编辑本仓库的 [`.github/workflows/radar.yml`](../.github/workflows/radar.yml)。
 
-只有设置 Secret 还不够。**整个 GitHub Actions 当前均处于停用状态**。先按 [完整启用教程](./SETUP.md#0-恢复被注释的工作流必须先做) 将模板文件复制到 `.github/workflows/radar.yml`，取消顶部 `on` 事件块注释。之后还要给安卓取消 `NTFY_TOPIC` 的两行注释。
-
-1. 先按 [启用教程](./SETUP.md) 从 [`templates/radar.yml`](../templates/radar.yml) 恢复 `.github/workflows/radar.yml`，并取消触发器配置块的注释；**未恢复则不会触发任何运行**。
-2. 点击铅笔按钮编辑。
-3. 找到 `Test configured push channels` 下方 `env:` 中的注释行。
-4. 再找到 `Scan free games and notify` 下方 `env:` 中的同一行。
-5. **两处都删除行首的 `# `**，使配置变成：
+在 **Test configured push channels** 和 **Scan free games and notify** 两个任务下，分别找到注释：
 
 ```yaml
-env:
-  BARK_URL: ${{ secrets.BARK_URL }}
-  NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+# NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
 ```
 
-上面只展示 `env` 的相关两行；原有 `EPIC_COUNTRY`、`EPIC_LOCALE`、`MAX_PUSH` 配置请保留。
+将两处都改为有效配置（去掉行首 `# `）：
 
-6. 提交更改，回到 Actions 页面测试。这里的 `NTFY_TOPIC` 是 **Secret 名称**，不要把实际随机主题值写进工作流文件。
+```yaml
+NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+```
 
-**关闭安卓通知：** 把上述两处 `NTFY_TOPIC` 的行首重新加上 `# `，提交即可。**完全关闭所有 Actions**：删除 `.github/workflows/radar.yml`，把源码保存在 `templates/radar.yml`（本仓库目前就是这种状态）。
+注意保持与所在 `env:` 中其他字段相同的缩进。**只改一处可能导致测试可用，但定时扫描不推送，或反过来。**
 
-**只用安卓：** 取消两处 `NTFY_TOPIC` 注释、设置 Secret；`BARK_URL` 这个 Secret 没有配置也能运行。
+Bark 的配置不需要修改。可以只用 ntfy，也可以 Bark 和 ntfy 同时启用。
 
-## 6. 测试与正常扫描
+## 5. 测试
 
-1. 先确认已经恢复活动工作流且取消 **两处** `NTFY_TOPIC` 注释，再进入你自己仓库的 **Actions → Free Games Radar**。
-2. `Run workflow` → 选 `test`：向**所有已配置通道**各发一条测试消息。
-3. 确认安卓能收到「FreeGame Radar 测试成功」，点击可打开 GitHub 项目。
-4. `Run workflow` → 选 `scan`：检查当前免费游戏，推送给尚未通知过的各个通道。
+1. 打开自己仓库的 **Actions → Free Games Radar**。
+2. 点击 **Run workflow**，选择 `test`。
+3. 安卓应收到「FreeGame Radar 测试成功」，点击后打开项目页面。
+4. 选择 `scan`，扫描免费游戏；发现新活动时，向已配置的通道推送。
 
-新的 ntfy 渠道在首次扫描时，可能会收到几个当前有效活动；之后按通道与游戏活动去重。即使 Bark 已收到过，安卓仍能收到自己第一次的活动通知。
+相同游戏在不同设备通道独立去重，支持多台安卓通过同一主题订阅。
+
+## 6. 停用 ntfy（保留 Actions 扫描）
+
+重新注释工作流中的两处 `NTFY_TOPIC` 环境变量，或删除 GitHub Secret。无推送通道时，程序继续扫描并更新 [免费游戏清单](../FREE_GAMES.md)，不会发送消息。
 
 ## 7. 常见问题
 
-**安卓收不到通知：** 先确认工作流中两处 `NTFY_TOPIC` 已取消注释，再检查 ntfy App 订阅主题是否和 GitHub Secret 完全一致、通知权限、后台/省电策略、`ntfy.sh` 的网络可达性。尝试保持 App 打开，再运行 `test`。
+**安卓没有通知：** 核对主题名、Secret、两处环境变量、ntfy App 通知权限、网络访问和系统后台限制。
 
-**有没有时效限制：** 公共 ntfy 服务可能限制消息存储时长；免费游戏雷达仓库中的 [当前活动清单](../FREE_GAMES.md) 会持续更新，便于回看。不能承诺 ntfy 服务永久保存历史。
+**通知会永久保存吗？** 无法保证。公共 ntfy 服务有自身的消息存储策略，可以通过仓库 [活动清单](../FREE_GAMES.md) 查看扫描结果。
 
-**能只用安卓、不用 iPhone 吗：** 可以，删除 `BARK_URL` Secret 或留空，只保留 `NTFY_TOPIC`。反过来仅用 Bark 也可正常运行。
+**免费游戏会自动入库吗？** 不会。点击 ntfy 通知只会打开活动页面，仍需按平台规则自行领取。
 
-**同一个游戏重复通知？** 代码会按「通道 + 活动 ID」去重，并用游戏名称指纹在 45 天内抑制相同游戏的多条赠送活动。某些数据源更名或仓库状态写回失败仍可能造成少量重复，不承诺绝对零重复。
+**会泄露个人信息吗？** 系统仅推送公开游戏名称与活动链接，不应把账号密码或私人内容发到公共 ntfy 主题。主题随机化降低被猜到的可能，不等于身份认证或端到端加密。
 
-**能点通知直接领取吗？** 点击通知可以打开游戏活动页；仍需要手动确认领取，不能自动入库。
-
-[← 返回项目首页](../README.md) · [常见问题](./FAQ.md) · [安全说明](../SECURITY.md)
+[← 返回 README](../README.md) · [完整部署指南](./SETUP.md) · [安全说明](../SECURITY.md)
