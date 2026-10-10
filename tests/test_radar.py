@@ -162,5 +162,59 @@ class RadarTests(unittest.TestCase):
         self.assertIn("以活动页面为准", body)
         self.assertNotIn("北京时间", body)
 
+
+    def test_ntfy_json_push_and_click(self):
+        class FakeResponse:
+            status = 200
+            def __enter__(self):
+                return self
+            def __exit__(self, *args):
+                pass
+            def read(self):
+                return b'{"id":"test"}'
+        topic = "freegame_" + ("a" * 24)
+        with patch.object(radar, "urlopen", return_value=FakeResponse()) as call:
+            radar.ntfy_notify(topic, "游戏测试", "点击打开", "https://store.epicgames.com/")
+            request = call.call_args.args[0]
+            self.assertEqual(request.full_url, "https://ntfy.sh/")
+            content = json.loads(request.data)
+            self.assertEqual(content["topic"], topic)
+            self.assertEqual(content["title"], "游戏测试")
+            self.assertEqual(content["click"], "https://store.epicgames.com/")
+        with self.assertRaises(ValueError):
+            radar.ntfy_notify("short", "title", "body", "https://example.com")
+
+    def test_two_channels_dedupe_and_legacy_bark_state(self):
+        game = {"id": "epic:test:2026-10-10", "platform": "Epic",
+                "title": "Two-channel test",
+                "url": "https://store.epicgames.com/p/something",
+                "end": "2026-10-20T00:00:00Z", "note": "Test"}
+        with tempfile.TemporaryDirectory() as temp:
+            sent_path = Path(temp) / "sent.json"
+            sent_path.write_text(json.dumps({game["id"]: radar.utc_now().isoformat()}),
+                                 encoding="utf-8")
+            with (
+                patch.object(radar, "SENT_FILE", sent_path),
+                patch.object(radar, "CURRENT_FILE", Path(temp) / "current.json"),
+                patch.object(radar, "OUTPUT_FILE", Path(temp) / "FREE_GAMES.md"),
+                patch.object(radar, "collect_games", return_value=([game], [])),
+                patch.object(radar, "bark_notify") as bark,
+                patch.object(radar, "ntfy_notify") as ntfy,
+                patch.dict(os.environ, {"BARK_URL": "https://api.day.app/test",
+                                        "NTFY_TOPIC": "freegame_" + "z" * 25,
+                                        "MAX_PUSH": "8"}),
+            ):
+                radar.scan()
+                radar.scan()
+                self.assertEqual(bark.call_count, 0)
+                self.assertEqual(ntfy.call_count, 1)
+                state = json.loads(sent_path.read_text())
+                self.assertIn("ntfy:" + game["id"], state)
+
+    def test_no_channel_raises(self):
+        with patch.dict(os.environ, {"BARK_URL": "", "NTFY_TOPIC": ""}):
+            with self.assertRaises(RuntimeError):
+                radar.configured_channels()
+
 if __name__ == "__main__":
     unittest.main()
