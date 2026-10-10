@@ -5,10 +5,11 @@
 ## 不应提交到 GitHub 的资料
 
 - Bark 设备密钥与推送 URL（例如完整 `https://api.day.app/...`）。
+- ntfy 随机主题名（不应发布于公开代码；公共 ntfy 主题默认没有强制身份验证）。
 - Epic / Steam 账号密码、浏览器 Cookie、Token、短信验证码、备用码。
 - 自建 Bark 服务器密码及其他服务的 API Key。
 
-请将 Bark URL 保存为 **Repository Secret**：`BARK_URL`。**不要**把它写入 README、普通 Variables、Issue、Discussion、Pull Request、Actions 日志或截图中。
+请将 Bark URL 保存为 **Repository Secret**：`BARK_URL`；安卓 ntfy 主题保存为 `NTFY_TOPIC`。**不要**把它写入 README、普通 Variables、Issue、Discussion、Pull Request、Actions 日志或截图中。
 
 ## 密钥泄露如何处理
 
@@ -22,7 +23,8 @@
 ## 依赖和网络边界
 
 - 本项目无外部 pip 依赖，使用 Python 标准库。
-- GitHub Actions 在 GitHub 托管的运行环境中执行；该环境内的脚本**会读取** `BARK_URL`，用于向推送服务发送通知。
+- GitHub Actions 在 GitHub 托管的运行环境中执行；该环境内的脚本**会读取** `BARK_URL` 或 `NTFY_TOPIC`，用于向推送服务发送通知。
+- 免费的公共 `ntfy.sh` 主题默认没有身份验证；知道主题的人可能查看或发送此主题通知。不要用它来传输私密数据。
 - 仓库 Actions 工作流可以修改时，应特别审查后续对 `radar.py` 和 workflow 文件的提交。
 - 数据请求依赖 Epic 公开促销接口及 GamerPower API；上游信息可能有误或延迟。
 
