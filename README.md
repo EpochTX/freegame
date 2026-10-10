@@ -4,30 +4,30 @@
 
 **Epic / Steam 免费游戏雷达 · 自动推送到 iPhone 和 Android**
 
-![Status](https://img.shields.io/badge/Status-Paused-lightgrey)
+[![Free Games Radar](https://github.com/EpochTX/freegame/actions/workflows/radar.yml/badge.svg)](https://github.com/EpochTX/freegame/actions/workflows/radar.yml)
 ![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)
 ![GitHub Actions](https://img.shields.io/badge/Automation-GitHub%20Actions-2088FF?logo=githubactions&logoColor=white)
 ![Bark](https://img.shields.io/badge/iOS-Bark-27AE60)
 ![ntfy](https://img.shields.io/badge/Android-ntfy-2581C4)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
-**当前暂停运行 · 以后按需启用 iOS Bark / Android ntfy · 完整源码及注释均保留**
+**自动扫描已启用 · 未配置推送 Secret 时静默运行 · 可选 iOS Bark / Android ntfy**
 
-[🔌 恢复运行](./docs/SETUP.md) · [🧩 注释版工作流](./templates/radar.yml) · [🤖 安卓 ntfy](./docs/ANDROID.md) · [📖 部署教程](./docs/SETUP.md) · [❓ 常见问题](./docs/FAQ.md)
+[🎁 当前免费游戏](./FREE_GAMES.md) · [⚙️ Actions](https://github.com/EpochTX/freegame/actions/workflows/radar.yml) · [🤖 安卓 ntfy](./docs/ANDROID.md) · [📖 部署教程](./docs/SETUP.md) · [❓ 常见问题](./docs/FAQ.md)
 
 </div>
 
 ---
 
-## ⏸️ 当前状态：默认停用
+## ✅ 当前状态：自动扫描，通知可选
 
-> **当前仓库不会运行任何 GitHub Actions，也不会自动扫描或推送消息。**
+> **GitHub Actions 已恢复。** 默认北京时间约 03:17、09:17、15:17、21:17 扫描 Epic 和 Steam，更新 [当前免费游戏列表](./FREE_GAMES.md)。
 >
-> 为避免不必要的自动运行与 Bark 通知，原本的 `.github/workflows/radar.yml` 已移走，全部保留为 [`templates/radar.yml`](./templates/radar.yml) **注释版模板**。GitHub 只会从 `.github/workflows/` 读取工作流，所以模板不会执行。
+> **不想收到消息？在你自己的 GitHub 仓库删除 `BARK_URL` Secret 即可。** 缺少 Bark/ntfy Secret 不会让扫描失败，也不会触发任何推送。
 >
-> **想启用？** 将 `templates/radar.yml` 复制为 `.github/workflows/radar.yml`，再把文件顶部 `# on:` 开始的触发器配置块前的 `# ` 注释删除，设置对应的 GitHub Secrets，提交后才会启用。**只删除注释而不复制到工作流目录，也不会运行。**
+> **想收到消息？** 在 GitHub Actions Secrets 新建 `BARK_URL`，填写个人 Bark HTTPS 推送地址；安卓 ntfy 需要另外设置 `NTFY_TOPIC` 并取消 [工作流](./.github/workflows/radar.yml) 里的两处注释。推送完全可选。
 >
-> 启用前不需要输入 Bark Key、也不用担心收到游戏通知。完整操作见 [恢复运行教程](./docs/SETUP.md)。
+> 代码提交会运行**离线单元测试**，不会仅因为更新代码就扫描、推送；真正扫描由定时事件或手动 `scan` 触发。
 
 ## ✨ 这是什么？
 
@@ -41,7 +41,7 @@
 >
 > *以上是通知效果示意，并非当前真实活动。*
 
-启用后项目可以运行在 **GitHub Actions** 上，不用自己买服务器、提供游戏账号密码或让电脑一直开机；**当前仓库未启用该功能**。
+项目已经运行在 **GitHub Actions** 上，无需 VPS、游戏账号密码或常开电脑。未填写任何推送密钥时只更新活动列表，不会推送。
 
 ## 📦 能做什么？
 
@@ -49,10 +49,10 @@
 | :--- | :---: | :--- |
 | 🎮 Epic 限时免费 | ✅ | 根据 Epic 公开促销接口筛选“原价大于 0、当前 0 元且促销有效”的商品 |
 | 🚂 Steam 赠送活动 | ✅ | 读取 GamerPower 的 Steam 活动列表；可能包含第三方领码活动 |
-| 📲 iOS Bark / Android ntfy | ⏸️ | 目前均停用；代码已保留，恢复工作流时由使用者自行选择 |
-| ⏰ 定时监控 | ⏸️ | 工作流模板已保留；仓库当前不运行，启用后默认每 6 小时一次 |
+| 📲 iOS Bark / Android ntfy | 可选 | 不填 Secret 就不会推送；安卓还需要取消两处注释 |
+| ⏰ 定时监控 | ✅ | 默认每 6 小时扫描一次，更新最新游戏列表 |
 | 🔁 双重防重复 | ✅ | 各通道独立记录活动 ID，同游戏名 45 天内避免重复提醒 |
-| 🧪 一键测试 | ⏸️ | 恢复工作流后才可运行测试推送 |
+| 🧪 一键测试 | ✅ | 未配置任何推送通道时会安全跳过测试，不会报错 |
 | 📋 当前活动清单 | ✅ | 扫描后自动更新 [FREE_GAMES.md](./FREE_GAMES.md) |
 | 🆓 免费部署 | ✅ | 不需要额外付费服务；受 GitHub Actions 免费额度与政策约束 |
 | 🛒 自动下单入库 | ❌ | **不会**登录游戏账号或代替你确认领取 |
@@ -61,13 +61,13 @@
 
 ## 🚀 快速开始
 
-**项目当前已暂停。** 新用户可 Fork 仓库、按下面步骤手动恢复工作流；不恢复就不会触发任何扫描和推送。
+**项目现在已启用自动扫描。** 新用户 Fork 后，可以使用现有 Actions 工作流；不想通知则不需要设置任何推送 Secret。
 
 ### 1. 获取项目
 
-打开 [EpochTX/freegame](https://github.com/EpochTX/freegame)，选择 **Fork**。然后把仓库的 `templates/radar.yml` 复制为 `.github/workflows/radar.yml`，去掉模板顶部事件触发器配置块各行前面的 `# `。如果不做这两步，**GitHub Actions 不会运行**。不需要 VPS 或自建数据库。
+打开 [EpochTX/freegame](https://github.com/EpochTX/freegame) 选择 **Fork**。工作流已放在 `.github/workflows/radar.yml`，无需复制模板；Fork 用户可能需要在自己的仓库 Actions 页面启用工作流。
 
-### 2. 自行启用工作流后，再配置手机通知（任选其一）
+### 2. 按需配置手机通知（完全可跳过）
 
 在你的仓库打开 **Settings → Secrets and variables → Actions → New repository secret**。
 
@@ -84,16 +84,16 @@
 
 ### 3. 测试是否收到通知
 
-完成工作流恢复及 Secret 配置后，打开自己仓库的 **Actions → Free Games Radar**，选择：
+打开自己仓库的 **Actions → Free Games Radar**，选择：
 
 1. **Run workflow** → **mode: `test`**：检查所有已配置的手机是否收到「测试成功」推送。
 2. 再执行 **mode: `scan`**：真正查询 Epic / Steam，更新 [活动清单](./FREE_GAMES.md) 并推送尚未记录的新活动。
 
 新设备首次启用推送时，可能收到当前已经存在的活动；之后按通道分别去重。同款游戏在 45 天内即使上游换了赠送 ID，也会尝试抑制重复提醒。
 
-### 4. 只有恢复并启用定时触发器后才自动运行
+### 4. 自动定时运行
 
-**目前不会执行。** 未来使用者按教程恢复并取消注释 `schedule` 后，GitHub Actions 才会按下面的 UTC 时刻触发：
+GitHub Actions 会按下面的 UTC 时刻触发；无推送密钥时仅更新游戏列表：
 
 | UTC | 北京时间（UTC+8） |
 | --- | --- |
@@ -142,7 +142,8 @@ flowchart LR
 ## 📁 项目结构
 
 ```text
-templates/radar.yml           # 暂停状态的完整工作流模板（触发器已注释）
+.github/workflows/radar.yml   # 已恢复的自动扫描工作流（含推送可选配置）
+templates/radar.yml           # 供学习或停用时使用的注释版模板
 radar.py                      # Epic、Steam 检测 + Bark / ntfy 推送
 tests/test_radar.py           # 无需联网的单元测试
 data/sent.json                # 已通知活动 ID + 游戏指纹、双端独立去重
@@ -179,9 +180,9 @@ python radar.py
 
 **Steam 为什么跳到 GamerPower？** Steam 活动来自公开聚合接口，可能包含第三方领码任务，项目不能保证 Steam 官方商店直接免费入库。
 
-**为什么 Actions 页面没有自动执行？** 仓库默认停用，工作流被移到 `templates/`。需要先按 [恢复教程](./docs/SETUP.md) 将文件复制进 `.github/workflows/` 并解除触发器注释；启用后无新游戏也不会发通知。
+**为什么有 Actions 运行但不发 Bark？** 因为只有填入有效的 `BARK_URL` 才会发送通知。缺少 Secret 时正常静默扫描，最新游戏直接查看 [FREE_GAMES.md](./FREE_GAMES.md)。
 
-**能改成每天只推送一次吗？** 可以编辑 [工作流模板](./templates/radar.yml) 中的 cron，启用时再取消对应注释。请注意 UTC 时间与 GitHub 调度延迟。
+**能改成每天只扫描一次吗？** 可以编辑 [正在运行的工作流](./.github/workflows/radar.yml) 里的 cron，注意 UTC 时区及 GitHub 可能延迟。
 
 更多见 [FAQ](./docs/FAQ.md)。
 
