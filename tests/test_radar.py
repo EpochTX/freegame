@@ -113,10 +113,54 @@ class RadarTests(unittest.TestCase):
             payload = json.loads(request.data)
             self.assertEqual(payload["group"], "免费游戏雷达")
             self.assertEqual(payload["url"], "https://store.epicgames.com/")
+            self.assertEqual(payload["title"], "title")
+            self.assertEqual(payload["body"], "body")
+            self.assertEqual(payload["isArchive"], "1")
+            self.assertNotIn("ttl", payload)
         with self.assertRaises(ValueError):
             radar.bark_notify("http://api.day.app/testkey", "title", "body",
                               "https://store.epicgames.com/")
 
+
+    def test_normalize_bark_example_removes_ttl_and_placeholder(self):
+        example = "https://api.day.app/testkey/title/body?group=example&ttl=600"
+        self.assertEqual(radar.normalize_bark_url(example),
+                         "https://api.day.app/testkey")
+        self.assertEqual(radar.normalize_bark_url("https://api.day.app/testkey/"),
+                         "https://api.day.app/testkey")
+        with self.assertRaises(ValueError):
+            radar.normalize_bark_url("https://api.day.app/push")
+
+    def test_full_example_posts_real_game_title_and_archive(self):
+        class FakeResponse:
+            status = 200
+            def __enter__(self):
+                return self
+            def __exit__(self, *args):
+                pass
+            def read(self):
+                return b'{"code":200}'
+        game = {"platform": "Epic", "title": "Pony Island",
+                "end": "2026-10-16T15:00:00Z",
+                "note": "Epic 官方限时免费；领取时请核对账号所在地区。"}
+        title, body = radar.make_push_text(game)
+        self.assertIn("Pony Island", title)
+        self.assertIn("北京时间 10月16日 23:00", body)
+        with patch.object(radar, "urlopen", return_value=FakeResponse()) as mock_open:
+            radar.bark_notify("https://api.day.app/testkey/title/body?group=example&ttl=600",
+                              title, body, "https://store.epicgames.com/")
+            request = mock_open.call_args.args[0]
+            self.assertEqual(request.full_url, "https://api.day.app/testkey")
+            self.assertEqual(json.loads(request.data)["title"], title)
+            self.assertNotIn("ttl", json.loads(request.data))
+
+    def test_steam_deadline_not_falsely_converted_to_beijing(self):
+        game = {"platform": "Steam", "title": "Free Steam Game",
+                "end": "2026-10-20 00:00:00", "note": "第三方免费游戏"}
+        title, body = radar.make_push_text(game)
+        self.assertIn("Steam", title)
+        self.assertIn("以活动页面为准", body)
+        self.assertNotIn("北京时间", body)
 
 if __name__ == "__main__":
     unittest.main()
