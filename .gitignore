@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Local secrets / sensitive config
+.env
+.env.*
+!.env.example
+config.json
+secrets.json
+*bark-secret*
+
+# GitHub Actions generates these tracked files on purpose:
+# data/sent.json
+# data/current.json
+# FREE_GAMES.md
