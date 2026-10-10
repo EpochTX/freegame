@@ -456,7 +456,10 @@ def main() -> None:
     parser.add_argument("--test-push", action="store_true", help="仅测试 Bark")
     args = parser.parse_args()
     if args.test_push:
-        for channel, endpoint in configured_channels().items():
+        channels = configured_channels(required=False)
+        if not channels:
+            print("未配置 BARK_URL 或 NTFY_TOPIC；通知测试已跳过（正常状态）。")
+        for channel, endpoint in channels.items():
             send_to_channel(
                 channel, endpoint,
                 "✅ FreeGame Radar 测试成功",
