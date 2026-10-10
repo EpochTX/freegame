@@ -1,6 +1,12 @@
 name: Free Games Radar
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'radar.py'
+      - 'tests/**'
+      - '.github/workflows/radar.yml'
   schedule:
     # UTC 01:17, 07:17, 13:17, 19:17 = 北京 09:17、15:17、21:17、次日 03:17
     - cron: "17 1,7,13,19 * * *"
@@ -45,7 +51,7 @@ jobs:
         run: python radar.py --test-push
 
       - name: Scan free games and notify
-        if: ${{ github.event_name == 'schedule' || inputs.mode != 'test' }}
+        if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.mode != 'test') }}
         env:
           BARK_URL: ${{ secrets.BARK_URL }}
           EPIC_COUNTRY: ${{ vars.EPIC_COUNTRY || 'CN' }}
@@ -54,7 +60,7 @@ jobs:
         run: python radar.py
 
       - name: Commit updated state and game list
-        if: ${{ github.event_name == 'schedule' || inputs.mode != 'test' }}
+        if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.mode != 'test') }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
