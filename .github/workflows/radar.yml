@@ -67,7 +67,24 @@ jobs:
           git add -- data/sent.json data/current.json FREE_GAMES.md
           if ! git diff --cached --quiet; then
             git commit -m "chore: refresh free game radar state [skip ci]"
-            git push
+            # README or docs might change during a scan. Retry with a rebase
+            # instead of losing sent.json after Bark has already pushed.
+            for attempt in 1 2 3 4; do
+              if git push origin HEAD:main; then
+                echo "Updated notification state and activity list."
+                exit 0
+              fi
+              echo "Push conflict; fetching latest main and rebasing (attempt $attempt)."
+              git fetch origin main
+              if ! git rebase origin/main; then
+                echo "::error::State rebase conflict; no files were discarded."
+                git rebase --abort || true
+                exit 1
+              fi
+              sleep 2
+            done
+            echo "::error::Unable to save radar state after 4 retries."
+            exit 1
           else
             echo "No state changes to commit."
           fi
