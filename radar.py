@@ -273,8 +273,12 @@ def ntfy_notify(topic: str, title: str, message: str, jump_url: str) -> None:
         raise RuntimeError(f"ntfy 推送失败（{type(exc).__name__}）") from None
 
 
-def configured_channels() -> dict[str, str]:
-    """At least one push channel; secrets must be set in GitHub Actions."""
+def configured_channels(required: bool = True) -> dict[str, str]:
+    """Return enabled push channels; scans may run without any secrets.
+
+    When both BARK_URL and NTFY_TOPIC are absent the radar still scans and
+    refreshes FREE_GAMES.md, but sends absolutely no notification.
+    """
     channels = {}
     bark = os.environ.get("BARK_URL", "").strip()
     ntfy = os.environ.get("NTFY_TOPIC", "").strip()
@@ -282,7 +286,7 @@ def configured_channels() -> dict[str, str]:
         channels["bark"] = bark
     if ntfy:
         channels["ntfy"] = ntfy
-    if not channels:
+    if required and not channels:
         raise RuntimeError("请先设置 BARK_URL（iOS）或 NTFY_TOPIC（安卓）Secret")
     return channels
 
@@ -409,7 +413,9 @@ def markdown_games(games: list[dict], errors: list[str]) -> str:
 
 
 def scan() -> None:
-    channels = configured_channels()
+    channels = configured_channels(required=False)
+    if not channels:
+        print("通知已关闭：未配置任何推送 Secret；只扫描并更新免费游戏列表。")
     now = utc_now()
     games, warnings = collect_games(now)
     for warning in warnings:
@@ -439,8 +445,8 @@ def scan() -> None:
     save_json(SENT_FILE, sent)
     save_json(CURRENT_FILE, games)
     OUTPUT_FILE.write_text(markdown_games(games, warnings), encoding="utf-8")
-    print(f"检索到 {len(games)} 个活动，成功通知：" +
-          ", ".join(f"{channel}={count}" for channel, count in counts.items()))
+    summary = ", ".join(f"{channel}={count}" for channel, count in counts.items()) or "通知关闭（0 条）"
+    print(f"检索到 {len(games)} 个活动；{summary}；已更新公开活动清单。")
     if failures:
         print(f"本次有 {len(failures)} 项通知失败，下次扫描将重试。")
 
