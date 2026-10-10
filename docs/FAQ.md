@@ -1,5 +1,9 @@
 # ❓ 常见问题（FAQ）
 
+## 0. Bark 历史消息为什么显示「几分钟后过期」，且标题是 title / body？
+
+如果 Secret 填的是 Bark 示例 URL `https://api.day.app/YOUR_DEVICE_KEY/title/body?group=example&ttl=600`，其中 `title/body` 是示例标题正文，`ttl=600` 会让已存档通知在 10 分钟后自动过期。现在项目会自动清除 URL 中的示例路径和查询参数，用 JSON POST 发送真实游戏名称；明确设置 `isArchive=1` 且**不指定 `ttl`**。建议你也把 GitHub Secret `BARK_URL` 修改为不含额外参数的基础地址。注意已过期的历史通知无法自动找回。
+
 ## 1. 这是自动领取 Epic / Steam 游戏的工具吗？
 
 **不是。** 项目只做「监控活动 → Bark 推送 → 点击打开活动页面」，不会执行登录、支付、下单或自动添加游戏到账号库。不要为了获得自动领取功能把账号密码交给陌生项目。
