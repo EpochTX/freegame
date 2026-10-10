@@ -89,7 +89,8 @@ class RadarTests(unittest.TestCase):
                 radar.scan()
                 radar.scan()
                 self.assertEqual(bark.call_count, 1)
-                self.assertEqual(len(json.loads(radar.SENT_FILE.read_text())), 1)
+                self.assertIn("bark:" + game["id"], json.loads(radar.SENT_FILE.read_text()))
+                self.assertIn("bark:" + radar.game_fingerprint(game), json.loads(radar.SENT_FILE.read_text()))
                 self.assertTrue(radar.OUTPUT_FILE.exists())
 
     def test_no_bark_secret_does_not_mark_sent(self):
@@ -215,6 +216,35 @@ class RadarTests(unittest.TestCase):
         with patch.dict(os.environ, {"BARK_URL": "", "NTFY_TOPIC": ""}):
             with self.assertRaises(RuntimeError):
                 radar.configured_channels()
+
+
+    def test_new_giveaway_id_same_game_is_suppressed(self):
+        game = {"id": "steam:gamerpower:100", "platform": "Steam",
+                "title": "Pony Island (Steam) Giveaway"}
+        duplicate = {"id": "steam:gamerpower:101", "platform": "Steam",
+                     "title": "Pony Island (Steam) Key Giveaway"}
+        self.assertEqual(radar.game_fingerprint(game), radar.game_fingerprint(duplicate))
+        now = radar.utc_now()
+        sent = {}
+        radar.mark_game_sent(sent, "bark", game, now)
+        self.assertTrue(radar.game_is_sent(sent, "bark", duplicate, now))
+        self.assertFalse(radar.game_is_sent(sent, "ntfy", duplicate, now))
+        self.assertFalse(radar.game_is_sent(sent, "bark", duplicate,
+                                            now + radar.timedelta(days=46)))
+
+    def test_backfill_legacy_state_for_new_id(self):
+        original = {"id": "steam:gamerpower:3716", "platform": "Steam",
+                    "title": "Dwarven Realms (Steam) Key Giveaway"}
+        same = {"id": "steam:gamerpower:3816", "platform": "Steam",
+                "title": "Dwarven Realms (Steam) Giveaway"}
+        with tempfile.TemporaryDirectory() as temp:
+            state = Path(temp) / "current.json"
+            state.write_text(json.dumps([original]), encoding="utf-8")
+            with patch.object(radar, "CURRENT_FILE", state):
+                sent = {original["id"]: radar.utc_now().isoformat()}
+                radar.upgrade_old_game_state(sent)
+            self.assertTrue(radar.game_is_sent(sent, "bark", same, radar.utc_now()))
+
 
 if __name__ == "__main__":
     unittest.main()
