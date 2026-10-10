@@ -5,7 +5,7 @@
 - iPhone：**Bark**（`BARK_URL`）。
 - Android：**ntfy**（`NTFY_TOPIC`）。
 
-**目前仓库默认启用 iPhone Bark、关闭安卓 ntfy。** 安卓实现代码已保留，但 GitHub Actions 中有两行 `NTFY_TOPIC` 被注释，需要使用者自行取消注释启用。启用后两个渠道可同时使用，也可只用其中一个。不需要部署服务器或提供游戏账号 Cookie。
+**本仓库当前完全停用：Bark 和 ntfy 均不运行，GitHub Actions 也不执行。** 完整工作流保存在 [`templates/radar.yml`](../templates/radar.yml)，其事件块已注释。未来使用者需要先恢复工作流，再根据设备启用 Bark 或 ntfy；不需要部署服务器或提供游戏账号 Cookie。
 
 ## 1. 安装 ntfy
 
@@ -57,11 +57,11 @@ python -c "import secrets; print('freegame_' + secrets.token_urlsafe(24))"
 
 仓库入口：[freegame Secrets](https://github.com/EpochTX/freegame/settings/secrets/actions)
 
-## 5. 取消 GitHub Actions 中的两处注释（必做）
+## 5. 恢复工作流并取消两处 ntfy 注释（必做）
 
-只有设置 Secret 还不够。**默认的安卓推送处于关闭状态**，需要让工作流把 `NTFY_TOPIC` 传给脚本。
+只有设置 Secret 还不够。**整个 GitHub Actions 当前均处于停用状态**。先按 [完整启用教程](./SETUP.md#0-恢复被注释的工作流必须先做) 将模板文件复制到 `.github/workflows/radar.yml`，取消顶部 `on` 事件块注释。之后还要给安卓取消 `NTFY_TOPIC` 的两行注释。
 
-1. 在你自己的仓库打开 [`.github/workflows/radar.yml`](../.github/workflows/radar.yml)。
+1. 先按 [启用教程](./SETUP.md) 从 [`templates/radar.yml`](../templates/radar.yml) 恢复 `.github/workflows/radar.yml`，并取消触发器配置块的注释；**未恢复则不会触发任何运行**。
 2. 点击铅笔按钮编辑。
 3. 找到 `Test configured push channels` 下方 `env:` 中的注释行。
 4. 再找到 `Scan free games and notify` 下方 `env:` 中的同一行。
@@ -77,13 +77,13 @@ env:
 
 6. 提交更改，回到 Actions 页面测试。这里的 `NTFY_TOPIC` 是 **Secret 名称**，不要把实际随机主题值写进工作流文件。
 
-**关闭安卓通知：** 把上述两处 `NTFY_TOPIC` 的行首重新加上 `# `，提交即可。不会影响 iPhone Bark。
+**关闭安卓通知：** 把上述两处 `NTFY_TOPIC` 的行首重新加上 `# `，提交即可。**完全关闭所有 Actions**：删除 `.github/workflows/radar.yml`，把源码保存在 `templates/radar.yml`（本仓库目前就是这种状态）。
 
 **只用安卓：** 取消两处 `NTFY_TOPIC` 注释、设置 Secret；`BARK_URL` 这个 Secret 没有配置也能运行。
 
 ## 6. 测试与正常扫描
 
-1. 先确认已取消 **两处** `NTFY_TOPIC` 注释，再进入 [Actions → Free Games Radar](https://github.com/EpochTX/freegame/actions/workflows/radar.yml)。
+1. 先确认已经恢复活动工作流且取消 **两处** `NTFY_TOPIC` 注释，再进入你自己仓库的 **Actions → Free Games Radar**。
 2. `Run workflow` → 选 `test`：向**所有已配置通道**各发一条测试消息。
 3. 确认安卓能收到「FreeGame Radar 测试成功」，点击可打开 GitHub 项目。
 4. `Run workflow` → 选 `scan`：检查当前免费游戏，推送给尚未通知过的各个通道。
