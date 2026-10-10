@@ -1,11 +1,13 @@
 # 🚀 详细部署教程
 
-> 本项目仅**发现并推送**免费游戏活动，**不会**自动登录或下单领取。最快 5 分钟开始测试。
+> 本项目仅**发现并推送**免费游戏活动，**不会**自动登录或下单领取。支持 iPhone Bark 和安卓 ntfy，最快 5 分钟开始测试。
 
 ## 准备工作
 
 - GitHub 账号和可以编辑的仓库（本项目：[EpochTX/freegame](https://github.com/EpochTX/freegame)）。
-- iPhone 安装 [Bark](https://github.com/Finb/Bark)，允许通知，并确认 Bark 已提供自己的推送地址。
+- iPhone：安装 [Bark](https://github.com/Finb/Bark)，允许通知，获取推送 URL。
+- 安卓：安装 [ntfy](https://docs.ntfy.sh/subscribe/phone/)，并订阅随机主题；具体见 [安卓接入指南](./ANDROID.md)。
+- **只需任选一种推送方式，也可以同时使用两种。**
 - 无需 GitHub 付费订阅、VPS、游戏账户密码或额外 API Key。具体 GitHub Actions 免费额度以 GitHub 官方规则为准。
 
 ## 1. Fork 或使用现有仓库
@@ -14,7 +16,7 @@
 
 **当前仓库维护者**：无需 Fork，直接使用已有的 `main` 分支。
 
-## 2. 设置 Bark Secret（最重要）
+## 2. 设置推送 Secret（任选 Bark 或 ntfy，也可以都设置）
 
 1. 在你自己的仓库中打开 **Settings**。
 2. 左侧点击 **Secrets and variables → Actions**。
@@ -28,6 +30,8 @@
 
 请保持末尾完整结构即可；**不要**添加 `/title/body`，本项目使用 POST 发送标题和内容。
 
+安卓：创建一个至少 20 字符的**随机主题**，在 GitHub Secrets 中添加 `NTFY_TOPIC`，值为主题名（不是 URL），并在 ntfy App 中订阅。详细步骤：[安卓推送指南](./ANDROID.md)。**公共 ntfy.sh 主题默认公开，知道主题名的人可能订阅或发送消息。**
+
 **避免十分钟自动过期：** 请仅填写 `https://api.day.app/YOUR_DEVICE_KEY/`，**不要**直接粘贴 Bark 示例 GET 命令、`/title/body` 或 `?group=example&ttl=600`。本项目会自动清理这些常见误输入，但建议在 GitHub Secret 中更正源地址。推送 JSON 使用 `isArchive=1`，且**不传 `ttl`**，让消息交由 Bark 历史记录管理。
 
 **安全：** Key 是发通知用的私密凭证。不要在公开代码、Issue、README、Variables 或聊天截图中暴露。如果曾把实际 Key 发布给他人，建议先更换 Key，并在 GitHub Secret 中同步替换。
@@ -37,7 +41,7 @@
 1. 打开 [Actions → Free Games Radar](https://github.com/EpochTX/freegame/actions/workflows/radar.yml)（Fork 用户请切换到自己仓库的同名页面）。
 2. 点击 **Run workflow**。
 3. 将 `mode` 设为 `test` 后运行。
-4. 等 Actions 运行结束，确认手机收到「FreeGame Radar 测试成功」，标题应是实际发送的测试标题，不应是字面量 `title` / `body`。
+4. 等 Actions 运行结束，确认所有已配置的手机都收到「FreeGame Radar 测试成功」，标题应是实际发送的测试标题，不应是字面量 `title` / `body`。
 
 **如果显示绿色但没收到推送：** 检查手机通知权限、专注模式、Bark 设备状态；也检查是不是把旧 Key 放在 Secret 中。GitHub 成功仅代表 Bark API 接受了请求，不是 Apple 推送一定展示。
 
@@ -48,7 +52,8 @@
 - 检测 Epic 官方公开促销数据。
 - 检测 GamerPower 列出的 Steam 免费完整游戏活动。
 - 过滤大部分常见试玩、DLC、道具活动。
-- 通知未记录的新活动，更新仓库里的 `FREE_GAMES.md`、`data/current.json`、`data/sent.json`。
+- 向各自**尚未通知**的设备推送新活动；每个通道按活动 ID、游戏名分别去重；相同游戏 45 天内尽量不重复提醒。
+- 更新仓库里的 `FREE_GAMES.md`、`data/current.json`、`data/sent.json`。
 
 如果本次没有新活动，**不会**强制发送「一切正常」通知。可以看 [当前活动清单](../FREE_GAMES.md)。
 
@@ -109,8 +114,10 @@ python radar.py              # 正式扫描
 
 - **Actions 页面**可以查看脚本执行成功或失败。
 - **绿色通过但没有游戏提醒：** 可能没有新游戏，或者已有去重记录。
-- **`Missing BARK_URL`：** Secret 不存在、拼写错、设置到了其他仓库或环境。
-- **`Bark 推送失败`：** 检查推送 Key 是否已过期及联网情况，勿公开完整日志中的敏感字段。
+- **未设置推送 Secret：** 至少需要 `BARK_URL` 或 `NTFY_TOPIC` 之一；注意 Secret 所属仓库。
+- **Bark 推送失败：** 检查推送 Key 是否已过期及联网情况。
+- **ntfy 无法送达：** 核对 App 主题和 `NTFY_TOPIC`、安卓通知权限、后台电池限制、`ntfy.sh` 访问是否畅通。
+- **偶尔重复提醒：** 以前更新仓库文档时可能导致状态提交冲突，现已增加重试提交、按通道分离和 45 天同游戏指纹；若任务中断在「通知已发、状态尚未提交」之间仍可能重复。
 - **扫描数据失败：** 上游 API 可能暂时不可用，重试或参考 [FAQ](./FAQ.md)。
 - **状态提交失败：** 确认 Action 工作流中的 `permissions: contents: write` 可用，并检查仓库是否启用了阻止 Bot 推送的分支保护。
 - **公开仓库停用定时任务：** GitHub 可能在长时间无活动后停用 schedule，需要重新启用。
