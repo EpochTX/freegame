@@ -62,8 +62,8 @@
 
 | 字段 | 填写内容 |
 | --- | --- |
-| **Name** | \`BARK_URL\` |
-| **Secret** | Bark App 提供的完整 HTTPS 推送 URL，如 \`https://api.day.app/YOUR_DEVICE_KEY/\` |
+| **Name** | `BARK_URL` |
+| **Secret** | Bark App 提供的完整 HTTPS 推送 URL，如 `https://api.day.app/YOUR_DEVICE_KEY/` |
 
 > 🔐 **不要**把真实 Bark Key、账号密码、Cookie、Token 填入源码、README、Issue 或 Actions Variables。请放在 **Secrets** 中。曾公开过的 Key 应先在 Bark 中轮换。
 
@@ -71,8 +71,8 @@
 
 [打开 Actions → Free Games Radar](https://github.com/EpochTX/freegame/actions/workflows/radar.yml)，选择：
 
-1. **Run workflow** → **mode: \`test\`**：检查手机是否收到「测试成功」推送。
-2. 再执行 **mode: \`scan\`**：真正查询 Epic / Steam，更新 [活动清单](./FREE_GAMES.md) 并推送尚未记录的新活动。
+1. **Run workflow** → **mode: `test`**：检查手机是否收到「测试成功」推送。
+2. 再执行 **mode: `scan`**：真正查询 Epic / Steam，更新 [活动清单](./FREE_GAMES.md) 并推送尚未记录的新活动。
 
 首次扫描可能连续提醒数个当前活动；之后只推送新发现的活动。
 
@@ -93,7 +93,7 @@
 
 ## 🧩 工作原理
 
-\`\`\`mermaid
+```mermaid
 flowchart LR
     A["GitHub Actions<br/>每 6 小时"] --> B["Epic 促销接口"]
     A --> C["GamerPower<br/>Steam 赠送"]
@@ -105,10 +105,10 @@ flowchart LR
     F --> H["记录去重状态"]
     H --> I["更新免费游戏清单"]
     G --> I
-\`\`\`
+```
 
 - **无额外依赖：** 核心脚本仅用 Python 标准库。
-- **状态可追踪：** \`data/sent.json\` 保存已通知活动，\`data/current.json\` 保存最新扫描结果。
+- **状态可追踪：** `data/sent.json` 保存已通知活动，`data/current.json` 保存最新扫描结果。
 - **消息到达确认：** 仅在 Bark API 返回成功后将该活动标记为已通知；API 成功不代表 iOS 一定实际弹出通知。
 - **隐私友好：** 不需要 Epic / Steam 账号凭证，但 Bark Secret 会在 GitHub Actions 执行环境中供本项目脚本使用。
 
@@ -118,15 +118,15 @@ flowchart LR
 
 | 变量 | 默认值 | 用途 |
 | --- | --- | --- |
-| \`EPIC_COUNTRY\` | \`CN\` | Epic 查询地区（如 \`CN\`、\`US\`） |
-| \`EPIC_LOCALE\` | \`zh-CN\` | Epic 页面语言（如 \`zh-CN\`、\`en-US\`） |
-| \`MAX_PUSH\` | \`8\` | 每次最多推送的新活动数，允许 1～20 |
+| `EPIC_COUNTRY` | `CN` | Epic 查询地区（如 `CN`、`US`） |
+| `EPIC_LOCALE` | `zh-CN` | Epic 页面语言（如 `zh-CN`、`en-US`） |
+| `MAX_PUSH` | `8` | 每次最多推送的新活动数，允许 1～20 |
 
-更改 \`MAX_PUSH\` 并不改变扫描频率。更改地区后，同一商品可能仍因去重状态而不再次提醒。
+更改 `MAX_PUSH` 并不改变扫描频率。更改地区后，同一商品可能仍因去重状态而不再次提醒。
 
 ## 📁 项目结构
 
-\`\`\`text
+```text
 .github/workflows/radar.yml   # 定时运行 / 手动测试 / 状态回写
 radar.py                      # Epic、Steam 检测 + Bark 推送
 tests/test_radar.py           # 无需联网的单元测试
@@ -138,24 +138,24 @@ docs/FAQ.md                   # 常见问题与故障排查
 SECURITY.md                   # 安全须知
 CONTRIBUTING.md               # 贡献指南
 LICENSE                       # MIT 开源协议
-\`\`\`
+```
 
 ## 🛠️ 本地调试
 
-需要 Python 3.11+，不需要 \`pip install\`：
+需要 Python 3.11+，不需要 `pip install`：
 
-\`\`\`bash
+```bash
 python -m unittest discover -s tests -v
-\`\`\`
+```
 
-设置好自己的环境变量 \`BARK_URL\` 之后可执行：
+设置好自己的环境变量 `BARK_URL` 之后可执行：
 
-\`\`\`bash
+```bash
 python radar.py --test-push
 python radar.py
-\`\`\`
+```
 
-**注意：** 在本地运行会改写 \`data/sent.json\`、\`data/current.json\`、\`FREE_GAMES.md\`。
+**注意：** 在本地运行会改写 `data/sent.json`、`data/current.json`、`FREE_GAMES.md`。
 
 ## ❓ 常见问题
 
@@ -163,7 +163,7 @@ python radar.py
 
 **Steam 为什么跳到 GamerPower？** Steam 活动来自公开聚合接口，可能包含第三方领码任务，项目不能保证 Steam 官方商店直接免费入库。
 
-**Actions 成功但手机没消息？** 先在 \`test\` 模式检查 Bark，确认推送权限与 Secret；新游戏未出现时正常不会发消息。详见 [排错说明](./docs/FAQ.md)。
+**Actions 成功但手机没消息？** 先在 `test` 模式检查 Bark，确认推送权限与 Secret；新游戏未出现时正常不会发消息。详见 [排错说明](./docs/FAQ.md)。
 
 **能改成每天只推送一次吗？** 可以编辑 [工作流](./.github/workflows/radar.yml) 里的 cron，但请注意 UTC 时间与 GitHub 调度延迟。
 
