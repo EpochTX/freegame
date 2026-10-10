@@ -8,6 +8,7 @@ import os
 import re
 import tempfile
 import time
+import unicodedata
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.error import HTTPError, URLError
@@ -286,9 +287,66 @@ def configured_channels() -> dict[str, str]:
     return channels
 
 
-def was_sent(sent: dict[str, str], channel: str, game_id: str) -> bool:
-    """Old id-only state is treated as previous Bark deliveries."""
-    return f"{channel}:{game_id}" in sent or (channel == "bark" and game_id in sent)
+def game_fingerprint(game: dict) -> str:
+    """Canonical identity for overlapping giveaways of the same game.
+
+    GamerPower may list the same game under new giveaway IDs or names such
+    as '(Steam) Key Giveaway'. The fingerprint prevents repeated alerts for
+    the same title within 45 days, while allowing later new promotions.
+    """
+    title = unicodedata.normalize("NFKC", str(game.get("title") or "")).casefold()
+    title = re.sub(
+        r"(?:\\s*\\((?:steam|epic(?: games store)?)\\))?\\s*(?:key\\s*)?(?:giveaway|free game)\\s*$",
+        "", title,
+    )
+    title = re.sub(r"\\s*\\((?:steam|epic(?: games store)?)\\)\\s*$", "", title)
+    name = re.sub(r"[^\\w]+", "-", title, flags=re.UNICODE).strip("-")
+    if not name:
+        name = str(game.get("id", "unknown"))
+    return f"game:{str(game.get('platform', '')).casefold()}:{name}"
+
+
+def game_is_sent(sent: dict[str, str], channel: str, game: dict,
+                 now: datetime) -> bool:
+    game_id = game["id"]
+    if f"{channel}:{game_id}" in sent:
+        return True
+    # Legacy id-only entries were delivered via Bark before ntfy was added.
+    if channel == "bark" and game_id in sent:
+        return True
+    stamp = parse_date(sent.get(f"{channel}:{game_fingerprint(game)}"))
+    return bool(stamp and now - timedelta(days=45) <= stamp <= now)
+
+
+def mark_game_sent(sent: dict[str, str], channel: str,
+                   game: dict, stamp: datetime) -> None:
+    sent[f"{channel}:{game['id']}"] = stamp.isoformat()
+    sent[f"{channel}:{game_fingerprint(game)}"] = stamp.isoformat()
+
+
+def upgrade_old_game_state(sent: dict[str, str]) -> None:
+    """Backfill fingerprints from last snapshot, without notifying again.
+
+    Old Bark state had bare IDs; early dual-channel state had namespaced IDs.
+    """
+    if not CURRENT_FILE.exists():
+        return
+    try:
+        previous = json.loads(CURRENT_FILE.read_text(encoding="utf-8"))
+    except (ValueError, OSError):
+        return
+    if not isinstance(previous, list):
+        return
+    for game in previous:
+        if not isinstance(game, dict) or not game.get("id"):
+            continue
+        for channel in ("bark", "ntfy"):
+            old = sent.get(f"{channel}:{game['id']}")
+            if channel == "bark":
+                old = old or sent.get(game["id"])
+            key = f"{channel}:{game_fingerprint(game)}"
+            if old and key not in sent:
+                sent[key] = old
 
 
 def send_to_channel(channel: str, endpoint: str, title: str,
@@ -357,6 +415,7 @@ def scan() -> None:
     for warning in warnings:
         print("提示：", warning)
     sent = read_sent()
+    upgrade_old_game_state(sent)
     cutoff = now - timedelta(days=120)
     sent = {key: value for key, value in sent.items()
             if (parse_date(value) or now) >= cutoff}
@@ -366,7 +425,7 @@ def scan() -> None:
     for game in games:
         title, body = make_push_text(game)
         for channel, endpoint in channels.items():
-            if was_sent(sent, channel, game["id"]) or counts[channel] >= limit:
+            if game_is_sent(sent, channel, game, now) or counts[channel] >= limit:
                 continue
             try:
                 send_to_channel(channel, endpoint, title, body, game["url"])
@@ -374,7 +433,7 @@ def scan() -> None:
                 failures.append(f"{channel} 通知失败：{type(exc).__name__}")
                 print("警告：", channel, "未推送成功，稍后将重试")
                 continue
-            sent[f"{channel}:{game['id']}"] = now.isoformat()
+            mark_game_sent(sent, channel, game, now)
             counts[channel] += 1
             print("已发送：", channel, game["platform"], game["title"])
     save_json(SENT_FILE, sent)
