@@ -19,6 +19,7 @@ ROOT = Path(__file__).resolve().parent
 SENT_FILE = ROOT / "data" / "sent.json"
 CURRENT_FILE = ROOT / "data" / "current.json"
 OUTPUT_FILE = ROOT / "FREE_GAMES.md"
+FIRST_SEEN_FILE = ROOT / "data" / "first_seen.json"
 GAMERPOWER = "https://www.gamerpower.com/api/giveaways"
 EPIC_API = "https://store-site-backend-static-ipv4.ak.epicgames.com/freeGamesPromotions"
 USER_AGENT = "EpochTX-FreeGame-Radar/1.0 (+https://github.com/EpochTX/freegame)"
@@ -94,6 +95,7 @@ def parse_epic(data: dict, now: datetime, locale: str) -> list[dict]:
                     "platform": "Epic",
                     "title": str(item.get("title") or "未知游戏"),
                     "url": epic_link(item, locale),
+                    "start": start.isoformat(),
                     "end": end.isoformat(),
                     "note": "Epic 官方限时免费；领取时请核对账号所在地区。",
                 })
@@ -177,6 +179,56 @@ def collect_games(now: datetime) -> tuple[list[dict], list[str]]:
         raise RuntimeError("所有来源均不可用，取消更新以免覆盖有效状态")
     unique = {g["id"]: g for g in games}
     return sorted(unique.values(), key=lambda g: (g["platform"], g["title"].casefold())), errors
+
+
+def record_first_seen(games: list[dict], now: datetime) -> dict[str, str]:
+    """Persist when this radar first recorded each giveaway, across scan gaps.
+
+    Pre-existing games receive their first tracked timestamp on upgrade; this
+    cannot reconstruct the actual first appearance before tracking was added.
+    """
+    if FIRST_SEEN_FILE.exists():
+        seen = json.loads(FIRST_SEEN_FILE.read_text(encoding="utf-8"))
+        if not isinstance(seen, dict):
+            raise ValueError("data/first_seen.json 需要是 JSON 对象")
+    else:
+        seen = {}
+    cutoff = now - timedelta(days=180)
+    recent = {}
+    for identifier, raw in seen.items():
+        stamp = parse_date(raw) if isinstance(raw, str) else None
+        if stamp and cutoff <= stamp <= now:
+            recent[str(identifier)] = stamp.isoformat()
+    for game in games:
+        identifier = game["id"]
+        first = parse_date(recent.get(identifier)) or now
+        game["added_at"] = first.isoformat()
+        recent[identifier] = first.isoformat()
+    return recent
+
+
+def format_beijing(raw: str | None, unknown: str = "尚未记录") -> str:
+    stamp = parse_date(raw)
+    if stamp is None:
+        return unknown
+    bjt = stamp.astimezone(timezone(timedelta(hours=8)))
+    return bjt.strftime("%Y-%m-%d %H:%M") + "（北京时间）"
+
+
+def format_deadline(game: dict) -> str:
+    """Never invent a timezone for GamerPower's naive end_date strings."""
+    raw = str(game.get("end") or "").strip()
+    if not raw or raw in {"N/A", "Unknown"}:
+        return "未公布（请以活动页面为准）"
+    if game.get("platform") == "Epic":
+        return format_beijing(raw, "未公布（请以活动页面为准）")
+    if re.search(r"(?:Z|[+-]\d{2}:?\d{2})$", raw, re.I):
+        return format_beijing(raw, "未公布（请以活动页面为准）")
+    if re.fullmatch(r"\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(?::\d{2})?", raw):
+        return raw[:16].replace("T", " ") + "（来源未注明时区）"
+    if re.fullmatch(r"\d{4}-\d{2}-\d{2}", raw):
+        return raw + "（来源未注明时区）"
+    return "时间信息不明确（请以活动页面为准）"
 
 
 def read_sent() -> dict[str, str]:
@@ -389,6 +441,8 @@ def markdown_games(games: list[dict], errors: list[str]) -> str:
         "",
         "> 自动查询 Epic 官方促销和 GamerPower 赠送活动。仅供提醒，以最终领取页面为准。",
         "",
+        "> 🕒 **时间说明**：加入时间是雷达首次记录该活动的时间（旧活动从此功能启用后的首次扫描开始计时），不等于游戏活动开始时间。所有时间以领取页面为准。",
+        "",
     ]
     for platform in ("Epic", "Steam"):
         lines += [f"## {platform}", ""]
@@ -398,7 +452,12 @@ def markdown_games(games: list[dict], errors: list[str]) -> str:
             continue
         for game in group:
             safe_title = game["title"].replace("[", "［").replace("]", "］").replace("\n", " ")
-            lines += [f"- **[{safe_title}]({game['url']})** — {game['note']}", ""]
+            lines.append(f"- **[{safe_title}]({game['url']})**")
+            lines.append(f"  - 📥 **加入时间**：{format_beijing(game.get('added_at'), '待下次扫描记录')}")
+            if platform == "Epic":
+                lines.append(f"  - 🕓 **活动开始**：{format_beijing(game.get('start'), '待下次扫描获取')}")
+            lines.append(f"  - ⏳ **截止时间**：{format_deadline(game)}")
+            lines.extend([f"  - ℹ️ **说明**：{game['note']}", ""])
     if errors:
         lines += ["## 数据源提示", ""]
         lines += [f"- {warning}" for warning in errors]
@@ -418,6 +477,7 @@ def scan() -> None:
         print("通知已关闭：未配置任何推送 Secret；只扫描并更新免费游戏列表。")
     now = utc_now()
     games, warnings = collect_games(now)
+    seen = record_first_seen(games, now)
     for warning in warnings:
         print("提示：", warning)
     sent = read_sent()
@@ -443,6 +503,7 @@ def scan() -> None:
             counts[channel] += 1
             print("已发送：", channel, game["platform"], game["title"])
     save_json(SENT_FILE, sent)
+    save_json(FIRST_SEEN_FILE, seen)
     save_json(CURRENT_FILE, games)
     OUTPUT_FILE.write_text(markdown_games(games, warnings), encoding="utf-8")
     summary = ", ".join(f"{channel}={count}" for channel, count in counts.items()) or "通知关闭（0 条）"

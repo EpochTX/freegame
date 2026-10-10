@@ -42,6 +42,7 @@ class RadarTests(unittest.TestCase):
         self.assertEqual(games[0]["title"], "Free this week")
         self.assertEqual(games[0]["url"], "https://store.epicgames.com/zh-CN/p/good-game")
         self.assertTrue(games[0]["id"].startswith("epic:123:"))
+        self.assertEqual(games[0]["start"], "2026-10-09T15:00:00+00:00")
 
     def test_epic_safe_search_link_fallback(self):
         link = radar.epic_link({"title": "Hello World", "productSlug": "games/bad-path"},
@@ -80,6 +81,7 @@ class RadarTests(unittest.TestCase):
             with (
                 patch.object(radar, "SENT_FILE", Path(temp) / "data" / "sent.json"),
                 patch.object(radar, "CURRENT_FILE", Path(temp) / "data" / "current.json"),
+                patch.object(radar, "FIRST_SEEN_FILE", Path(temp) / "first_seen.json"),
                 patch.object(radar, "OUTPUT_FILE", Path(temp) / "FREE_GAMES.md"),
                 patch.object(radar, "collect_games", return_value=([game], [])),
                 patch.object(radar, "bark_notify") as bark,
@@ -105,6 +107,7 @@ class RadarTests(unittest.TestCase):
             with (
                 patch.object(radar, "SENT_FILE", sent_path),
                 patch.object(radar, "CURRENT_FILE", current_path),
+                patch.object(radar, "FIRST_SEEN_FILE", Path(temp) / "first_seen.json"),
                 patch.object(radar, "OUTPUT_FILE", md_path),
                 patch.object(radar, "collect_games", return_value=([game], [])),
                 patch.object(radar, "bark_notify") as bark,
@@ -114,7 +117,10 @@ class RadarTests(unittest.TestCase):
                 radar.scan()
                 self.assertTrue(md_path.exists())
                 self.assertIn("No Push Needed", md_path.read_text())
-                self.assertEqual(json.loads(current_path.read_text()), [game])
+                saved_games = json.loads(current_path.read_text())
+                self.assertEqual(saved_games[0]["id"], game["id"])
+                self.assertIsNotNone(radar.parse_date(saved_games[0]["added_at"]))
+                self.assertTrue((Path(temp) / "first_seen.json").exists())
                 self.assertEqual(json.loads(sent_path.read_text()), {})
                 bark.assert_not_called()
                 ntfy.assert_not_called()
@@ -218,6 +224,7 @@ class RadarTests(unittest.TestCase):
             with (
                 patch.object(radar, "SENT_FILE", sent_path),
                 patch.object(radar, "CURRENT_FILE", Path(temp) / "current.json"),
+                patch.object(radar, "FIRST_SEEN_FILE", Path(temp) / "first_seen.json"),
                 patch.object(radar, "OUTPUT_FILE", Path(temp) / "FREE_GAMES.md"),
                 patch.object(radar, "collect_games", return_value=([game], [])),
                 patch.object(radar, "bark_notify") as bark,
@@ -265,6 +272,45 @@ class RadarTests(unittest.TestCase):
                 sent = {original["id"]: radar.utc_now().isoformat()}
                 radar.upgrade_old_game_state(sent)
             self.assertTrue(radar.game_is_sent(sent, "bark", same, radar.utc_now()))
+
+
+    def test_first_seen_survives_scan_gap_and_does_not_reset(self):
+        game = {"id": "steam:gamerpower:42", "platform": "Steam", "title": "Test"}
+        with tempfile.TemporaryDirectory() as temp:
+            with patch.object(radar, "FIRST_SEEN_FILE", Path(temp) / "seen.json"):
+                first = radar.record_first_seen([game.copy()], NOW)
+                radar.save_json(radar.FIRST_SEEN_FILE, first)
+                next_day = NOW + radar.timedelta(days=1)
+                empty = radar.record_first_seen([], next_day)
+                radar.save_json(radar.FIRST_SEEN_FILE, empty)
+                again = [game.copy()]
+                radar.record_first_seen(again, next_day + radar.timedelta(days=1))
+                self.assertEqual(again[0]["added_at"], NOW.isoformat())
+
+    def test_markdown_shows_added_start_end_and_steam_unknown_timezone(self):
+        epic = {"platform": "Epic", "title": "Epic game",
+                "url": "https://store.epicgames.com/p/game",
+                "added_at": "2026-10-10T12:00:00Z",
+                "start": "2026-10-09T15:00:00Z",
+                "end": "2026-10-16T15:00:00Z", "note": "Epic promotion"}
+        steam = {"platform": "Steam", "title": "Steam game",
+                 "url": "https://www.gamerpower.com/open/game",
+                 "added_at": "2026-10-10T12:00:00Z",
+                 "end": "2026-10-12 23:59:00", "note": "Third party"}
+        md = radar.markdown_games([epic, steam], [])
+        self.assertIn("**加入时间**：2026-10-10 20:00（北京时间）", md)
+        self.assertIn("**活动开始**：2026-10-09 23:00（北京时间）", md)
+        self.assertIn("**截止时间**：2026-10-16 23:00（北京时间）", md)
+        self.assertIn("**截止时间**：2026-10-12 23:59（来源未注明时区）", md)
+        self.assertNotIn("2026-10-13 07:59", md)
+
+    def test_steam_unknown_deadline_is_not_guessed(self):
+        game = {"platform": "Steam", "end": "N/A"}
+        self.assertIn("未公布", radar.format_deadline(game))
+        self.assertEqual(
+            radar.format_deadline({"platform": "Steam", "end": "2026-10-12T15:00:00Z"}),
+            "2026-10-12 23:00（北京时间）"
+        )
 
 
 if __name__ == "__main__":

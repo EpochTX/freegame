@@ -41,11 +41,14 @@ FreeGame Radar 利用 **GitHub Actions** 定时检查 Epic Games Store 和 Steam
 | 🎮 Epic 限免 | 从 Epic 公开促销数据识别正在进行的限时免费活动 |
 | 🚂 Steam 赠送 | 从 GamerPower 公共数据源筛选 Steam 完整游戏赠送信息 |
 | 🕒 自动更新 | GitHub Actions 每 6 小时检查，自动更新活动清单 |
+| 📅 时间详情 | 游戏清单显示首次加入时间、截止时间；Epic 同时显示活动开始时间 |
 | 🔕 静默运行 | 不设置 `BARK_URL` / `NTFY_TOPIC` 也能正常工作，不推送 |
 | 📲 可选通知 | iOS 使用 Bark；Android 可启用 ntfy |
 | 🔁 双层去重 | 分通道记录活动 ID，并用规范化名称抑制 45 天内同游戏重复提醒 |
 | 🔗 领取直达 | 通知可点击打开对应活动页面 |
 | 🧪 自动测试 | Python 标准库实现，附离线单元测试 |
+
+**时间说明：** `FREE_GAMES.md` 的“加入时间”是本雷达首次记录该活动的时间，不等于官方限免开始时间；旧活动在启用该功能后的首次扫描才开始记录，无法追溯以前的首次加入时间。Epic 活动开始与截止时间统一转换为北京时间（UTC+8）；GamerPower 若未声明截止时间的时区，则展示其原始时间并标注“来源未注明时区”，未知期限标注“未公布”。首次加入时间保存在 `data/first_seen.json`，不会随每次扫描重置。
 
 **数据范围：** Steam 部分可能包含第三方领码活动，不一定是 Steam 商店直接免费入库。活动有效期、地区、价格与领取资格均以原页面为准；试玩、DLC 等内容会尽力过滤，但仍可能有遗漏或误报。
 
@@ -122,6 +125,7 @@ flowchart TD
 radar.py                       # 数据源解析、去重、通知实现
 tests/test_radar.py            # 离线单元测试
 data/current.json              # 最近一次扫描的活动
+data/first_seen.json           # 游戏首次扫描加入时间（自动生成）
 data/sent.json                 # 通知去重记录（不含密钥）
 FREE_GAMES.md                  # 自动更新的活动清单
 docs/SETUP.md                  # 完整部署指南

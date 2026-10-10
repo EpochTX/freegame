@@ -85,7 +85,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -- data/sent.json data/current.json FREE_GAMES.md
+          git add -- data/sent.json data/current.json data/first_seen.json FREE_GAMES.md
           if ! git diff --cached --quiet; then
             git commit -m "chore: refresh free game radar state [skip ci]"
             # README or docs might change during a scan. Retry with a rebase
