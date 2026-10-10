@@ -20,9 +20,13 @@
 
 Epic 的促销可能有地区限制、时段差异或页面缓存。脚本默认 `EPIC_COUNTRY=CN`，但无法代替账户登录后最终的价格验证。请以你的 Epic 账户结账页面为准。
 
+## 4.5 Android 怎么接收免费游戏提醒？
+
+安装 [ntfy](https://docs.ntfy.sh/subscribe/phone/)，在 App 里订阅你生成的随机主题，在 GitHub Actions Secrets 中设置 `NTFY_TOPIC`，然后运行 `test`。已有 iOS Bark 不受影响。完整步骤见 [安卓 ntfy 教程](./ANDROID.md)。公共主题默认不设访问控制，切勿用于私密账号信息。
+
 ## 5. 没有 Bark 消息，是不是坏了？
 
-未必。只有出现**尚未通知过的活动**时才发消息。先运行 Actions → `Free Games Radar` → `Run workflow` → `test`，确认手机能接收；再运行 `scan` 检查日志和 [FREE_GAMES.md](../FREE_GAMES.md)。
+未必。只有出现**对该设备通道而言尚未通知过的活动**时才发消息。先运行 Actions → `Free Games Radar` → `Run workflow` → `test`，确认手机能接收；再运行 `scan` 检查日志和 [FREE_GAMES.md](../FREE_GAMES.md)。
 
 ## 6. GitHub Actions 显示成功，但为什么 Bark 没弹窗？
 
@@ -32,9 +36,13 @@ Epic 的促销可能有地区限制、时段差异或页面缓存。脚本默认
 
 这是预期行为：脚本首次看到当前有效的活动时尚无去重记录，会按默认 `MAX_PUSH=8` 上限依次通知；未推送的活动可能在下次扫描补发。之后相同活动不再重复推送。
 
-## 8. 之前的免费游戏为什么不再提示？
+## 8. 同一游戏为什么不再提示？
 
-`data/sent.json` 已记录被成功提交给 Bark API 的活动。状态会跟随仓库提交持久保存。如果手动清空这个文件，当前活动会被当作新的活动，可能重复提醒。
+`data/sent.json` 会分别记录 Bark、ntfy 成功推送的活动 ID，还增加了规范化的游戏名指纹。例如「Pony Island (Steam) Giveaway」和「Pony Island (Steam) Key Giveaway」在 45 天内会被视为同一游戏，从而避免重复提醒。该冷却期也可能过滤 45 天内真正重新开放的同款游戏活动。如果清空状态文件，当前活动会再次触发推送。
+
+## 8.5 为什么以前会重复提醒？
+
+曾发生「推送成功但 GitHub 在回写状态文件时遭遇并发更新失败」的情况，导致下一轮重复推送。现已增加 Git 提交重试、按通知渠道单独保存状态、游戏名 45 天冷却去重。仍有极端情况（例如进程在推送成功与 Git 提交之间突然退出）无法保证 100% 不重复。
 
 ## 9. 怎样改变监控频率？
 
@@ -42,7 +50,7 @@ Epic 的促销可能有地区限制、时段差异或页面缓存。脚本默认
 
 ## 10. 监控会使用我的 Epic / Steam 账号吗？
 
-**不会。** 脚本不需要游戏账号密码、验证码、Cookie、Token。唯一的私密配置是 Bark 的推送 URL，需要保存在 GitHub Secret 中；游戏活动信息来自公开接口。
+**不会。** 脚本不需要游戏账号密码、验证码、Cookie、Token。私密配置是 Bark 推送 URL 或 ntfy 随机主题，需要保存在 GitHub Secrets 中；游戏活动信息来自公开接口。
 
 ## 11. 为什么不能把 Bark 地址直接写进仓库？
 
