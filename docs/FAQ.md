@@ -1,5 +1,11 @@
 # ❓ 常见问题（FAQ）
 
+## ⏸️ 0. 为什么这个仓库没有运行 GitHub Actions，也不会推送 Bark？
+
+**仓库作者已暂停整个项目。** 当前没有任何活动工作流，原来的文件已放在 [`templates/radar.yml`](../templates/radar.yml)，并把 `on` 触发器事件块用 `#` 注释掉。**Bark 和安卓 ntfy 都不会自动推送**。
+
+想要自己使用：先 Fork，复制模板到 `.github/workflows/radar.yml`，取消模板顶部 `on` 事件块的注释，按照 [恢复教程](./SETUP.md) 在自己的仓库设置对应 Secrets，才能启用。仅填写 `BARK_URL` 或 `NTFY_TOPIC` 不会让当前仓库运行。
+
 ## 0. Bark 历史消息为什么显示「几分钟后过期」，且标题是 title / body？
 
 如果 Secret 填的是 Bark 示例 URL `https://api.day.app/YOUR_DEVICE_KEY/title/body?group=example&ttl=600`，其中 `title/body` 是示例标题正文，`ttl=600` 会让已存档通知在 10 分钟后自动过期。现在项目会自动清除 URL 中的示例路径和查询参数，用 JSON POST 发送真实游戏名称；明确设置 `isArchive=1` 且**不指定 `ttl`**。建议你也把 GitHub Secret `BARK_URL` 修改为不含额外参数的基础地址。注意已过期的历史通知无法自动找回。
@@ -22,7 +28,7 @@ Epic 的促销可能有地区限制、时段差异或页面缓存。脚本默认
 
 ## 4.5 Android 怎么接收免费游戏提醒？
 
-安装 [ntfy](https://docs.ntfy.sh/subscribe/phone/)，在 App 里订阅你生成的随机主题，在 GitHub Actions Secrets 中设置 `NTFY_TOPIC`，然后运行 `test`。已有 iOS Bark 不受影响。完整步骤见 [安卓 ntfy 教程](./ANDROID.md)。公共主题默认不设访问控制，切勿用于私密账号信息。
+**先按 [启用教程](./SETUP.md) 恢复自己仓库中的工作流**。然后安装 [ntfy](https://docs.ntfy.sh/subscribe/phone/)，在 App 里订阅你生成的随机主题，在 GitHub Actions Secrets 中设置 `NTFY_TOPIC`，取消两处环境变量注释，再运行 `test`。已有 iOS Bark 不受影响。完整步骤见 [安卓 ntfy 教程](./ANDROID.md)。公共主题默认不设访问控制，切勿用于私密账号信息。
 
 ## 5. 没有 Bark 消息，是不是坏了？
 
