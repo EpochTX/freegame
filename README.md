@@ -11,7 +11,7 @@
 ![ntfy](https://img.shields.io/badge/Android-ntfy-2581C4)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
-**全自动发现 · Bark + ntfy 双端推送 · 点击直达活动 · 45 天同游戏防重复 · 无需 VPS**
+**当前暂停运行 · 以后按需启用 iOS Bark / Android ntfy · 完整源码及注释均保留**
 
 [🔌 恢复运行](./docs/SETUP.md) · [🧩 注释版工作流](./templates/radar.yml) · [🤖 安卓 ntfy](./docs/ANDROID.md) · [📖 部署教程](./docs/SETUP.md) · [❓ 常见问题](./docs/FAQ.md)
 
@@ -41,7 +41,7 @@
 >
 > *以上是通知效果示意，并非当前真实活动。*
 
-项目运行在 **GitHub Actions** 上，不用自己买服务器、提供游戏账号密码或让电脑一直开机。
+启用后项目可以运行在 **GitHub Actions** 上，不用自己买服务器、提供游戏账号密码或让电脑一直开机；**当前仓库未启用该功能**。
 
 ## 📦 能做什么？
 
@@ -49,7 +49,7 @@
 | :--- | :---: | :--- |
 | 🎮 Epic 限时免费 | ✅ | 根据 Epic 公开促销接口筛选“原价大于 0、当前 0 元且促销有效”的商品 |
 | 🚂 Steam 赠送活动 | ✅ | 读取 GamerPower 的 Steam 活动列表；可能包含第三方领码活动 |
-| 📲 iOS Bark / Android ntfy | ✅ | 可单独启用或同时启用，带真实游戏名称、活动链接 |
+| 📲 iOS Bark / Android ntfy | ⏸️ | 目前均停用；代码已保留，恢复工作流时由使用者自行选择 |
 | ⏰ 定时监控 | ⏸️ | 工作流模板已保留；仓库当前不运行，启用后默认每 6 小时一次 |
 | 🔁 双重防重复 | ✅ | 各通道独立记录活动 ID，同游戏名 45 天内避免重复提醒 |
 | 🧪 一键测试 | ⏸️ | 恢复工作流后才可运行测试推送 |
