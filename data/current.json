@@ -6,7 +6,8 @@
     "url": "https://store.epicgames.com/zh-CN/p/terrascape-2b12b1",
     "end": "2026-10-15T15:00:00+00:00",
     "note": "Epic 官方限时免费；领取时请核对账号所在地区。",
-    "added_at": "2026-10-10T13:37:45+00:00"
+    "added_at": "2026-10-10T13:37:45+00:00",
+    "status": "active"
   },
   {
     "id": "epic:cb733f3432db46bca94965b422c33ede:2026-10-08",
@@ -15,7 +16,8 @@
     "url": "https://store.epicgames.com/zh-CN/p/out-of-sight-b96ca8",
     "end": "2026-10-15T15:00:00+00:00",
     "note": "Epic 官方限时免费；领取时请核对账号所在地区。",
-    "added_at": "2026-10-10T13:37:45+00:00"
+    "added_at": "2026-10-10T13:37:45+00:00",
+    "status": "active"
   },
   {
     "id": "steam:gamerpower:3716",
@@ -24,7 +26,8 @@
     "url": "https://www.gamerpower.com/open/dwarven-realms-steam-key-giveaway",
     "end": "N/A",
     "note": "GamerPower 第三方活动；可能需领码、额外账号或满足地区条件。",
-    "added_at": "2026-10-10T13:37:45+00:00"
+    "added_at": "2026-10-10T13:37:45+00:00",
+    "status": "active"
   },
   {
     "id": "steam:gamerpower:3810",
@@ -33,7 +36,8 @@
     "url": "https://www.gamerpower.com/open/fireside-feelings-steam-giveaway",
     "end": "2026-10-12 23:59:00",
     "note": "GamerPower 第三方活动；可能需领码、额外账号或满足地区条件。",
-    "added_at": "2026-10-10T13:37:45+00:00"
+    "added_at": "2026-10-10T13:37:45+00:00",
+    "status": "active"
   },
   {
     "id": "steam:gamerpower:3809",
@@ -42,6 +46,7 @@
     "url": "https://www.gamerpower.com/open/pony-island-steam-giveaway",
     "end": "2026-10-12 23:59:00",
     "note": "GamerPower 第三方活动；可能需领码、额外账号或满足地区条件。",
-    "added_at": "2026-10-10T13:37:45+00:00"
+    "added_at": "2026-10-10T13:37:45+00:00",
+    "status": "active"
   }
 ]

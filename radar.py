@@ -20,6 +20,9 @@ SENT_FILE = ROOT / "data" / "sent.json"
 CURRENT_FILE = ROOT / "data" / "current.json"
 OUTPUT_FILE = ROOT / "FREE_GAMES.md"
 FIRST_SEEN_FILE = ROOT / "data" / "first_seen.json"
+EXPIRED_FILE = ROOT / "data" / "expired.json"
+ARCHIVE_DAYS = 60
+ARCHIVE_LIMIT = 80
 GAMERPOWER = "https://www.gamerpower.com/api/giveaways"
 EPIC_API = "https://store-site-backend-static-ipv4.ak.epicgames.com/freeGamesPromotions"
 USER_AGENT = "EpochTX-FreeGame-Radar/1.0 (+https://github.com/EpochTX/freegame)"
@@ -73,7 +76,10 @@ def epic_link(item: dict, locale: str) -> str:
 
 
 def parse_epic(data: dict, now: datetime, locale: str) -> list[dict]:
-    elements = data.get("data", {}).get("Catalog", {}).get("searchStore", {}).get("elements", [])
+    # Unexpected response shapes must not be treated as an empty promotion list.
+    elements = data.get("data", {}).get("Catalog", {}).get("searchStore", {}).get("elements")
+    if not isinstance(elements, list):
+        raise ValueError("Epic 促销接口缺少活动列表")
     found = []
     for item in elements:
         if not isinstance(item, dict):
@@ -148,13 +154,14 @@ def get_gamerpower(platform: str):
     return parse_gamerpower(fetch_json(url), platform)
 
 
-def collect_games(now: datetime) -> tuple[list[dict], list[str]]:
+def collect_games(now: datetime) -> tuple[list[dict], list[str], set[str]]:
     country = os.environ.get("EPIC_COUNTRY", "CN").strip().upper() or "CN"
     locale = os.environ.get("EPIC_LOCALE", "zh-CN").strip() or "zh-CN"
     if not re.fullmatch(r"[A-Z]{2}", country) or not re.fullmatch(r"[a-z]{2}-[A-Z]{2}", locale):
         raise ValueError("EPIC_COUNTRY / EPIC_LOCALE 配置不正确")
     errors = []
     successes = 0
+    verified = set()
     games = []
     try:
         epic_url = EPIC_API + "?" + urlencode(
@@ -162,6 +169,7 @@ def collect_games(now: datetime) -> tuple[list[dict], list[str]]:
         )
         games.extend(parse_epic(fetch_json(epic_url), now, locale))
         successes += 1
+        verified.add("Epic")
     except (RuntimeError, ValueError, TypeError, AttributeError, KeyError) as exc:
         errors.append(f"Epic 官方接口失败：{type(exc).__name__}")
         try:
@@ -173,12 +181,13 @@ def collect_games(now: datetime) -> tuple[list[dict], list[str]]:
     try:
         games.extend(get_gamerpower("Steam"))
         successes += 1
+        verified.add("Steam")
     except (RuntimeError, ValueError, TypeError) as exc:
         errors.append(f"Steam 数据源失败：{type(exc).__name__}")
     if not successes:
         raise RuntimeError("所有来源均不可用，取消更新以免覆盖有效状态")
     unique = {g["id"]: g for g in games}
-    return sorted(unique.values(), key=lambda g: (g["platform"], g["title"].casefold())), errors
+    return sorted(unique.values(), key=lambda g: (g["platform"], g["title"].casefold())), errors, verified
 
 
 def record_first_seen(games: list[dict], now: datetime) -> dict[str, str]:
@@ -229,6 +238,88 @@ def format_deadline(game: dict) -> str:
     if re.fullmatch(r"\d{4}-\d{2}-\d{2}", raw):
         return raw + "（来源未注明时区）"
     return "时间信息不明确（请以活动页面为准）"
+
+
+def reliable_deadline(game: dict) -> datetime | None:
+    """Epic or timezone-aware deadlines only; GamerPower naive times stay unknown."""
+    raw = str(game.get("end") or "").strip()
+    if game.get("platform") == "Epic":
+        return parse_date(raw)
+    if re.search(r"(?:Z|[+-]\d{2}:?\d{2})$", raw, re.I):
+        return parse_date(raw)
+    return None
+
+
+def load_games(path: Path) -> list[dict]:
+    """Read our own tracked state; never silently lose history on malformed JSON."""
+    if not path.exists():
+        return []
+    contents = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(contents, list) or any(
+        not isinstance(x, dict) or not isinstance(x.get("id"), str)
+        for x in contents
+    ):
+        raise ValueError(f"{path.name} 活动记录格式不正确")
+    return contents
+
+
+def reconcile_games(fresh: list[dict], now: datetime,
+                    verified: set[str]) -> tuple[list[dict], list[dict]]:
+    """Move vanished/ended giveaways into a bounded archive, keeping uncertain ones separate.
+
+    A successful primary platform scan confirms absence. Epic's GamerPower
+    fallback is incomplete, so it must not mark missing Epic games as ended.
+    """
+    previous = {game["id"]: game for game in load_games(CURRENT_FILE)}
+    archived = {game["id"]: game for game in load_games(EXPIRED_FILE)}
+    fresh_ids = {game["id"] for game in fresh}
+    current = []
+
+    def finish(game: dict, reason: str, at: datetime) -> None:
+        copy = dict(game)
+        copy.pop("status", None)
+        copy["invalid_reason"] = reason
+        copy["invalid_at"] = at.isoformat()
+        archived[copy["id"]] = copy
+
+    for game in fresh:
+        item = dict(game)
+        old = previous.get(item["id"]) or archived.get(item["id"], {})
+        # Some fallback sources may omit official promotion details.
+        for attr in ("start", "added_at"):
+            if not item.get(attr) and old.get(attr):
+                item[attr] = old[attr]
+        deadline = reliable_deadline(item)
+        if deadline and now >= deadline:
+            finish(item, "已到截止时间", deadline)
+        else:
+            item["status"] = "active"
+            current.append(item)
+
+    for identifier, old in previous.items():
+        if identifier in fresh_ids:
+            continue
+        deadline = reliable_deadline(old)
+        if deadline and now >= deadline:
+            finish(old, "已到截止时间", deadline)
+        elif old.get("platform") in verified:
+            finish(old, "来源不再列出", now)
+        else:
+            waiting = dict(old)
+            waiting["status"] = "unverified"
+            current.append(waiting)
+
+    for item in current:
+        archived.pop(item["id"], None)
+    cutoff = now - timedelta(days=ARCHIVE_DAYS)
+    expired = [
+        item for item in archived.values()
+        if (stamp := parse_date(item.get("invalid_at"))) and cutoff <= stamp <= now
+    ]
+    expired.sort(key=lambda x: (x["invalid_at"], x["title"].casefold()), reverse=True)
+    expired = expired[:ARCHIVE_LIMIT]
+    current.sort(key=lambda x: (x["status"] != "active", x["platform"], x["title"].casefold()))
+    return current, expired
 
 
 def read_sent() -> dict[str, str]:
@@ -435,29 +526,64 @@ def make_push_text(game: dict) -> tuple[str, str]:
     return title, "\n".join(lines)
 
 
-def markdown_games(games: list[dict], errors: list[str]) -> str:
+def markdown_games(games: list[dict], errors: list[str],
+                   expired: list[dict] | None = None) -> str:
+    expired = expired or []
+    active = [g for g in games if g.get("status", "active") == "active"]
+    pending = [g for g in games if g.get("status") == "unverified"]
     lines = [
-        "# 🎁 当前免费游戏",
+        "# 🎁 免费游戏雷达｜领取状态",
         "",
-        "> 自动查询 Epic 官方促销和 GamerPower 赠送活动。仅供提醒，以最终领取页面为准。",
+        "> 自动查询 Epic 官方限免和 GamerPower 赠送活动。所有时间和领取资格以活动页面为准。",
         "",
-        "> 🕒 **时间说明**：加入时间是雷达首次记录该活动的时间（现有活动可依据仓库首次扫描提交时间补录，其他旧活动从启用后的首次扫描开始计时），不等于游戏活动开始时间。所有时间以领取页面为准。",
+        "> 🕒 **加入时间**指本雷达首次收录时间；Epic 已知起止时间显示为北京时间。"
+        " Steam 未提供时区的截止时间保留来源原文，不擅自换算。",
+        "",
+        f"**当前：{len(active)} 款可领取 · {len(expired)} 款已失效 · {len(pending)} 款待核实**",
+        "",
+        "## ✅ 正在免费领取（" + str(len(active)) + "）",
         "",
     ]
-    for platform in ("Epic", "Steam"):
-        lines += [f"## {platform}", ""]
-        group = [g for g in games if g["platform"] == platform]
-        if not group:
-            lines += ["当前未发现符合筛选条件的活动（也可能是来源暂时不可用）。", ""]
-            continue
-        for game in group:
-            safe_title = game["title"].replace("[", "［").replace("]", "］").replace("\n", " ")
-            lines.append(f"- **[{safe_title}]({game['url']})**")
-            lines.append(f"  - 📥 **加入时间**：{format_beijing(game.get('added_at'), '待下次扫描记录')}")
-            if platform == "Epic":
-                lines.append(f"  - 🕓 **活动开始**：{format_beijing(game.get('start'), '待下次扫描获取')}")
-            lines.append(f"  - ⏳ **截止时间**：{format_deadline(game)}")
-            lines.extend([f"  - ℹ️ **说明**：{game['note']}", ""])
+
+    def add_game(game: dict, kind: str) -> None:
+        title = str(game["title"]).replace("[", "［").replace("]", "］").replace("\n", " ")
+        lines.append(f"- **[{title}]({game['url']})**")
+        lines.append(f"  - 📥 **加入时间**：{format_beijing(game.get('added_at'), '尚未记录')}")
+        if game["platform"] == "Epic":
+            lines.append(f"  - 🕓 **活动开始**：{format_beijing(game.get('start'), '来源未提供')}")
+        lines.append(f"  - ⏳ **截止时间**：{format_deadline(game)}")
+        if kind == "expired":
+            lines.append(f"  - ⛔ **状态**：{game.get('invalid_reason', '已失效')}")
+            lines.append("  - 📅 **记录时间**：" + format_beijing(game.get("invalid_at")))
+        elif kind == "pending":
+            lines.append("  - ⚠️ **状态**：数据源暂不可核实，不能保证仍可领取")
+        lines.extend([f"  - ℹ️ {game.get('note', '活动以来源页面为准。')}", ""])
+
+    def add_group(items: list[dict], kind: str) -> None:
+        if not items:
+            lines.extend(["暂无符合条件的活动。", ""])
+            return
+        for platform in ("Epic", "Steam"):
+            group = [g for g in items if g.get("platform") == platform]
+            if not group:
+                continue
+            lines.extend([f"### {platform}（{len(group)}）", ""])
+            for game in group:
+                add_game(game, kind)
+
+    add_group(active, "active")
+    lines += [
+        "## ⛔ 已结束 / 已失效（" + str(len(expired)) + "）",
+        "",
+        "> 保留最近 60 天内最多 80 条失效记录。"
+        "“来源不再列出”表示本雷达已无法确认该优惠，并非官方宣布结束。",
+        "",
+    ]
+    add_group(expired, "expired")
+    if pending:
+        lines += ["## ⚠️ 状态待核实（" + str(len(pending)) + "）", "",
+                  "> 数据源暂时不可用；为了避免误报，这些活动暂不归入可领取或失效列表。", ""]
+        add_group(pending, "pending")
     if errors:
         lines += ["## 数据源提示", ""]
         lines += [f"- {warning}" for warning in errors]
@@ -476,8 +602,9 @@ def scan() -> None:
     if not channels:
         print("通知已关闭：未配置任何推送 Secret；只扫描并更新免费游戏列表。")
     now = utc_now()
-    games, warnings = collect_games(now)
-    seen = record_first_seen(games, now)
+    fresh, warnings, verified = collect_games(now)
+    seen = record_first_seen(fresh, now)
+    games, expired = reconcile_games(fresh, now, verified)
     for warning in warnings:
         print("提示：", warning)
     sent = read_sent()
@@ -488,7 +615,10 @@ def scan() -> None:
     limit = max(1, min(20, int(os.environ.get("MAX_PUSH", "8"))))
     counts = {channel: 0 for channel in channels}
     failures = []
+    fresh_ids = {g["id"] for g in fresh}
     for game in games:
+        if game.get("status") != "active" or game["id"] not in fresh_ids:
+            continue
         title, body = make_push_text(game)
         for channel, endpoint in channels.items():
             if game_is_sent(sent, channel, game, now) or counts[channel] >= limit:
@@ -505,9 +635,10 @@ def scan() -> None:
     save_json(SENT_FILE, sent)
     save_json(FIRST_SEEN_FILE, seen)
     save_json(CURRENT_FILE, games)
-    OUTPUT_FILE.write_text(markdown_games(games, warnings), encoding="utf-8")
+    save_json(EXPIRED_FILE, expired)
+    OUTPUT_FILE.write_text(markdown_games(games, warnings, expired), encoding="utf-8")
     summary = ", ".join(f"{channel}={count}" for channel, count in counts.items()) or "通知关闭（0 条）"
-    print(f"检索到 {len(games)} 个活动；{summary}；已更新公开活动清单。")
+    print(f"检索到 {len(fresh)} 个活动；已失效存档 {len(expired)} 个；{summary}；已更新公开活动清单。")
     if failures:
         print(f"本次有 {len(failures)} 项通知失败，下次扫描将重试。")
 

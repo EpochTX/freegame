@@ -83,7 +83,7 @@ class RadarTests(unittest.TestCase):
                 patch.object(radar, "CURRENT_FILE", Path(temp) / "data" / "current.json"),
                 patch.object(radar, "FIRST_SEEN_FILE", Path(temp) / "first_seen.json"),
                 patch.object(radar, "OUTPUT_FILE", Path(temp) / "FREE_GAMES.md"),
-                patch.object(radar, "collect_games", return_value=([game], [])),
+                patch.object(radar, "collect_games", return_value=([game], [], {"Epic"})),
                 patch.object(radar, "bark_notify") as bark,
                 patch.dict(os.environ, {"BARK_URL": "https://api.day.app/test",
                                         "MAX_PUSH": "8"}),
@@ -109,7 +109,7 @@ class RadarTests(unittest.TestCase):
                 patch.object(radar, "CURRENT_FILE", current_path),
                 patch.object(radar, "FIRST_SEEN_FILE", Path(temp) / "first_seen.json"),
                 patch.object(radar, "OUTPUT_FILE", md_path),
-                patch.object(radar, "collect_games", return_value=([game], [])),
+                patch.object(radar, "collect_games", return_value=([game], [], {"Epic"})),
                 patch.object(radar, "bark_notify") as bark,
                 patch.object(radar, "ntfy_notify") as ntfy,
                 patch.dict(os.environ, {"BARK_URL": "", "NTFY_TOPIC": ""}),
@@ -226,7 +226,7 @@ class RadarTests(unittest.TestCase):
                 patch.object(radar, "CURRENT_FILE", Path(temp) / "current.json"),
                 patch.object(radar, "FIRST_SEEN_FILE", Path(temp) / "first_seen.json"),
                 patch.object(radar, "OUTPUT_FILE", Path(temp) / "FREE_GAMES.md"),
-                patch.object(radar, "collect_games", return_value=([game], [])),
+                patch.object(radar, "collect_games", return_value=([game], [], {"Epic"})),
                 patch.object(radar, "bark_notify") as bark,
                 patch.object(radar, "ntfy_notify") as ntfy,
                 patch.dict(os.environ, {"BARK_URL": "https://api.day.app/test",
@@ -311,6 +311,141 @@ class RadarTests(unittest.TestCase):
             radar.format_deadline({"platform": "Steam", "end": "2026-10-12T15:00:00Z"}),
             "2026-10-12 23:00（北京时间）"
         )
+
+
+    def test_source_disappearance_moves_to_expired_and_keeps_first_seen(self):
+        old = {"id": "epic:old", "platform": "Epic", "title": "Old promotion",
+               "url": "https://store.epicgames.com/p/old",
+               "added_at": "2026-10-09T12:00:00Z", "end": "2026-10-16T15:00:00Z",
+               "note": "Promotion"}
+        with tempfile.TemporaryDirectory() as temp:
+            current = Path(temp) / "current.json"
+            archived = Path(temp) / "expired.json"
+            current.write_text(json.dumps([old]), encoding="utf-8")
+            with (patch.object(radar, "CURRENT_FILE", current),
+                  patch.object(radar, "EXPIRED_FILE", archived)):
+                active, expired = radar.reconcile_games([], NOW, {"Epic", "Steam"})
+                self.assertEqual(active, [])
+                self.assertEqual(len(expired), 1)
+                self.assertEqual(expired[0]["invalid_reason"], "来源不再列出")
+                self.assertEqual(expired[0]["added_at"], old["added_at"])
+                self.assertIn("已结束 / 已失效（1）", radar.markdown_games(active, [], expired))
+
+    def test_failed_platform_is_unverified_not_expired(self):
+        game = {"id": "epic:old", "platform": "Epic", "title": "Retained",
+                "url": "https://store.epicgames.com/p/old",
+                "end": "2026-10-16T15:00:00Z", "note": "Valid"}
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "current.json"
+            path.write_text(json.dumps([game]), encoding="utf-8")
+            with (patch.object(radar, "CURRENT_FILE", path),
+                  patch.object(radar, "EXPIRED_FILE", Path(temp) / "expired.json")):
+                active, expired = radar.reconcile_games([], NOW, {"Steam"})
+                self.assertEqual(active[0]["status"], "unverified")
+                self.assertEqual(expired, [])
+                md = radar.markdown_games(active, ["Epic 查询失败"], expired)
+                self.assertIn("状态待核实（1）", md)
+                self.assertIn("正在免费领取（0）", md)
+                self.assertNotIn("已结束 / 已失效（1）", md)
+
+    def test_expired_by_reliable_deadline_even_if_source_fails(self):
+        game = {"id": "epic:late", "platform": "Epic", "title": "Ended",
+                "url": "https://store.epicgames.com/p/late",
+                "end": "2026-10-10T11:00:00Z", "note": "Promotion"}
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "current.json"
+            path.write_text(json.dumps([game]), encoding="utf-8")
+            with (patch.object(radar, "CURRENT_FILE", path),
+                  patch.object(radar, "EXPIRED_FILE", Path(temp) / "expired.json")):
+                active, expired = radar.reconcile_games([], NOW, set())
+                self.assertEqual(active, [])
+                self.assertEqual(expired[0]["invalid_reason"], "已到截止时间")
+                self.assertEqual(expired[0]["invalid_at"], "2026-10-10T11:00:00+00:00")
+
+    def test_steam_naive_deadline_requires_source_absence(self):
+        game = {"id": "steam:old", "platform": "Steam", "title": "No TZ",
+                "url": "https://www.gamerpower.com/open/steam",
+                "end": "2026-10-01 23:59:00", "note": "Giveaway"}
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "current.json"
+            path.write_text(json.dumps([game]), encoding="utf-8")
+            with (patch.object(radar, "CURRENT_FILE", path),
+                  patch.object(radar, "EXPIRED_FILE", Path(temp) / "expired.json")):
+                active, archived = radar.reconcile_games([game], NOW, {"Steam"})
+                self.assertEqual(active[0]["status"], "active")
+                self.assertEqual(archived, [])
+                active, archived = radar.reconcile_games([], NOW, {"Steam"})
+                self.assertFalse(active)
+                self.assertEqual(archived[0]["invalid_reason"], "来源不再列出")
+
+    def test_expired_reappearance_is_restored_and_archive_deduped(self):
+        game = {"id": "epic:back", "platform": "Epic", "title": "Returned",
+                "url": "https://store.epicgames.com/p/back",
+                "end": "2026-10-16T15:00:00Z",
+                "added_at": "2026-10-09T12:00:00Z", "note": "Promotion"}
+        archive = dict(game, invalid_reason="来源不再列出",
+                       invalid_at="2026-10-10T11:00:00Z")
+        with tempfile.TemporaryDirectory() as temp:
+            current = Path(temp) / "current.json"
+            archived = Path(temp) / "expired.json"
+            current.write_text("[]", encoding="utf-8")
+            archived.write_text(json.dumps([archive]), encoding="utf-8")
+            with (patch.object(radar, "CURRENT_FILE", current),
+                  patch.object(radar, "EXPIRED_FILE", archived)):
+                active, expired = radar.reconcile_games([game], NOW, {"Epic"})
+                self.assertEqual(len(active), 1)
+                self.assertEqual(active[0]["status"], "active")
+                self.assertEqual(active[0]["added_at"], game["added_at"])
+                self.assertEqual(expired, [])
+
+    def test_archive_retention_and_limit(self):
+        with tempfile.TemporaryDirectory() as temp:
+            recent = [
+                {"id": f"epic:{i}", "platform": "Epic", "title": f"Game{i}",
+                 "url": "https://store.epicgames.com/",
+                 "invalid_at": "2026-10-10T11:00:00Z",
+                 "invalid_reason": "来源不再列出"}
+                for i in range(90)
+            ]
+            recent.append({"id": "epic:veryold", "platform": "Epic",
+                           "title": "Old", "url": "https://store.epicgames.com/",
+                           "invalid_at": "2026-07-01T10:00:00Z",
+                           "invalid_reason": "来源不再列出"})
+            archive = Path(temp) / "expired.json"
+            archive.write_text(json.dumps(recent), encoding="utf-8")
+            with (patch.object(radar, "CURRENT_FILE", Path(temp) / "current.json"),
+                  patch.object(radar, "EXPIRED_FILE", archive)):
+                active, expired = radar.reconcile_games([], NOW, set())
+                self.assertEqual(active, [])
+                self.assertEqual(len(expired), 80)
+                self.assertNotIn("epic:veryold", {x["id"] for x in expired})
+
+    def test_scan_sends_only_new_confirmed_active_not_unverified(self):
+        old = {"id": "epic:pending", "platform": "Epic", "title": "Pending",
+               "url": "https://store.epicgames.com/p/pending",
+               "end": "2026-10-16T15:00:00Z", "note": "Promotion"}
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp)
+            (directory / "current.json").write_text(json.dumps([old]), encoding="utf-8")
+            with (patch.object(radar, "SENT_FILE", directory / "sent.json"),
+                  patch.object(radar, "FIRST_SEEN_FILE", directory / "first_seen.json"),
+                  patch.object(radar, "CURRENT_FILE", directory / "current.json"),
+                  patch.object(radar, "EXPIRED_FILE", directory / "expired.json"),
+                  patch.object(radar, "OUTPUT_FILE", directory / "FREE_GAMES.md"),
+                  patch.object(radar, "collect_games", return_value=([], ["Epic 网络错误"], set())),
+                  patch.object(radar, "bark_notify") as bark,
+                  patch.dict(os.environ, {"BARK_URL": "https://api.day.app/test",
+                                          "NTFY_TOPIC": ""})):
+                radar.scan()
+                bark.assert_not_called()
+                md = radar.OUTPUT_FILE.read_text(encoding="utf-8")
+                self.assertIn("待核实（1）", md)
+                self.assertIn("正在免费领取（0）", md)
+
+    def test_epic_malformed_payload_is_error_not_zero_offers(self):
+        with self.assertRaises(ValueError):
+            radar.parse_epic({"data": {"Catalog": {}}}, NOW, "zh-CN")
+
 
 
 if __name__ == "__main__":
