@@ -2,17 +2,18 @@
 
 # 🎮 FreeGame Radar
 
-**Epic / Steam 免费游戏雷达 · 把限免消息直接送到你的 iPhone**
+**Epic / Steam 免费游戏雷达 · 自动推送到 iPhone 和 Android**
 
 [![Free Games Radar](https://github.com/EpochTX/freegame/actions/workflows/radar.yml/badge.svg)](https://github.com/EpochTX/freegame/actions/workflows/radar.yml)
 ![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)
 ![GitHub Actions](https://img.shields.io/badge/Automation-GitHub%20Actions-2088FF?logo=githubactions&logoColor=white)
-![Bark](https://img.shields.io/badge/Push-Bark-27AE60)
+![Bark](https://img.shields.io/badge/iOS-Bark-27AE60)
+![ntfy](https://img.shields.io/badge/Android-ntfy-2581C4)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
-**全自动发现 · Bark 即时推送 · 点击直达活动 · 跨次去重 · 无需 VPS**
+**全自动发现 · Bark + ntfy 双端推送 · 点击直达活动 · 45 天同游戏防重复 · 无需 VPS**
 
-[🎁 当前免费游戏](./FREE_GAMES.md) · [🚀 5 分钟部署](#-快速开始) · [📖 完整教程](./docs/SETUP.md) · [❓ 常见问题](./docs/FAQ.md) · [⚙️ Actions](https://github.com/EpochTX/freegame/actions/workflows/radar.yml)
+[🎁 当前免费游戏](./FREE_GAMES.md) · [🤖 安卓 ntfy](./docs/ANDROID.md) · [🚀 5 分钟部署](#-快速开始) · [📖 完整教程](./docs/SETUP.md) · [❓ 常见问题](./docs/FAQ.md) · [⚙️ Actions](https://github.com/EpochTX/freegame/actions/workflows/radar.yml)
 
 </div>
 
@@ -26,7 +27,7 @@
 >
 > 《示例游戏》现可免费领取，具体截止时间以活动页为准。
 >
-> **轻点 Bark 通知 → 打开活动页面 → 自己确认领取。**
+> **轻点手机通知 → 打开活动页面 → 自己确认领取。**
 >
 > *以上是通知效果示意，并非当前真实活动。*
 
@@ -38,10 +39,10 @@
 | :--- | :---: | :--- |
 | 🎮 Epic 限时免费 | ✅ | 根据 Epic 公开促销接口筛选“原价大于 0、当前 0 元且促销有效”的商品 |
 | 🚂 Steam 赠送活动 | ✅ | 读取 GamerPower 的 Steam 活动列表；可能包含第三方领码活动 |
-| 📲 Bark 手机推送 | ✅ | 展示真实游戏名称、北京时间截止信息（Epic）与领取链接 |
+| 📲 iOS Bark / Android ntfy | ✅ | 可单独启用或同时启用，带真实游戏名称、活动链接 |
 | ⏰ 定时监控 | ✅ | 默认每 6 小时一次，可手动运行 |
-| 🔁 自动去重 | ✅ | 按活动 ID 记录已通知项目，避免每次重复轰炸 |
-| 🧪 一键测试 | ✅ | 无需查询游戏即可先测试 Bark |
+| 🔁 双重防重复 | ✅ | 各通道独立记录活动 ID，同游戏名 45 天内避免重复提醒 |
+| 🧪 一键测试 | ✅ | 无需查询游戏即可测试全部已配置推送通道 |
 | 📋 当前活动清单 | ✅ | 扫描后自动更新 [FREE_GAMES.md](./FREE_GAMES.md) |
 | 🆓 免费部署 | ✅ | 不需要额外付费服务；受 GitHub Actions 免费额度与政策约束 |
 | 🛒 自动下单入库 | ❌ | **不会**登录游戏账号或代替你确认领取 |
@@ -50,13 +51,13 @@
 
 ## 🚀 快速开始
 
-**只需要一个 GitHub 仓库 + iPhone Bark App。** 新用户可先 Fork 本仓库；直接部署到现有仓库则从下面第 2 步开始。
+**只需要一个 GitHub 仓库 + Bark（iPhone）或 ntfy（安卓）。** 新用户可先 Fork 本仓库；直接部署到现有仓库则从下面第 2 步开始。
 
 ### 1. 获取项目
 
 打开 [EpochTX/freegame](https://github.com/EpochTX/freegame)，选择 **Fork**。GitHub Actions 工作流文件已经配置好，无需 VPS 或自建数据库。
 
-### 2. 设置 Bark 推送
+### 2. 配置手机通知（可任选其一或同时配置）
 
 在你的仓库打开 **Settings → Secrets and variables → Actions → New repository secret**。
 
@@ -64,6 +65,8 @@
 | --- | --- |
 | **Name** | `BARK_URL` |
 | **Secret** | Bark App 提供的完整 HTTPS 推送 URL，如 `https://api.day.app/YOUR_DEVICE_KEY/` |
+
+安卓：安装 [ntfy](https://docs.ntfy.sh/subscribe/phone/)，创建一个**高随机度**的订阅主题，仓库增加 Secret `NTFY_TOPIC`，值只填主题名本身；详细见 [安卓接入指南](./docs/ANDROID.md)。Bark 和 ntfy 可以同时存在。**ntfy.sh 公共主题默认不设访问控制，不适合发送隐私信息。**
 
 > 🔐 **不要**把真实 Bark Key、账号密码、Cookie、Token 填入源码、README、Issue 或 Actions Variables。请放在 **Secrets** 中。曾公开过的 Key 应先在 Bark 中轮换。
 
@@ -73,10 +76,10 @@
 
 [打开 Actions → Free Games Radar](https://github.com/EpochTX/freegame/actions/workflows/radar.yml)，选择：
 
-1. **Run workflow** → **mode: `test`**：检查手机是否收到「测试成功」推送。
+1. **Run workflow** → **mode: `test`**：检查所有已配置的手机是否收到「测试成功」推送。
 2. 再执行 **mode: `scan`**：真正查询 Epic / Steam，更新 [活动清单](./FREE_GAMES.md) 并推送尚未记录的新活动。
 
-首次扫描可能连续提醒数个当前活动；之后只推送新发现的活动。
+新设备首次启用推送时，可能收到当前已经存在的活动；之后按通道分别去重。同款游戏在 45 天内即使上游换了赠送 ID，也会尝试抑制重复提醒。
 
 ### 4. 之后自动运行
 
@@ -101,18 +104,18 @@ flowchart LR
     A --> C["GamerPower<br/>Steam 赠送"]
     B --> D["筛选有效活动"]
     C --> D
-    D --> E{"是否已通知？"}
-    E -->|否| F["Bark 推送到 iPhone"]
+    D --> E{"当前设备已通知 / 45天内同游戏？"}
+    E -->|否| F["Bark iOS + ntfy Android（分别判断）"]
     E -->|是| G["跳过重复"]
-    F --> H["记录去重状态"]
+    F --> H["按通道记录成功推送状态"]
     H --> I["更新免费游戏清单"]
     G --> I
 ```
 
 - **无额外依赖：** 核心脚本仅用 Python 标准库。
-- **状态可追踪：** `data/sent.json` 保存已通知活动，`data/current.json` 保存最新扫描结果。
-- **消息到达确认：** 仅在 Bark API 返回成功后将该活动标记为已通知；API 成功不代表 iOS 一定实际弹出通知。
-- **隐私友好：** 不需要 Epic / Steam 账号凭证，但 Bark Secret 会在 GitHub Actions 执行环境中供本项目脚本使用。
+- **双重防重复：** `data/sent.json` 按 Bark、ntfy 单独保存活动 ID 与规范化游戏名；同一游戏 45 天内抑制重复赠送活动，`data/current.json` 保存最新扫描结果。仓库推送状态失败时仍可能少量重复。
+- **消息到达确认：** 仅在对应通道的推送接口响应成功后写入去重状态；接口成功不保证手机系统一定展示通知。
+- **隐私与安全：** 不需要 Epic / Steam 账号凭证；Bark 和 ntfy Secret 由 GitHub Actions 读取。公共 ntfy 主题默认不具备真正的访问控制，请务必使用随机主题。
 
 ## ⚙️ 可选配置
 
@@ -130,13 +133,14 @@ flowchart LR
 
 ```text
 .github/workflows/radar.yml   # 定时运行 / 手动测试 / 状态回写
-radar.py                      # Epic、Steam 检测 + Bark 推送
+radar.py                      # Epic、Steam 检测 + Bark / ntfy 推送
 tests/test_radar.py           # 无需联网的单元测试
-data/sent.json                # 已通知 ID，用于跨运行去重
+data/sent.json                # 已通知活动 ID + 游戏指纹、双端独立去重
 data/current.json             # 最新扫描结果
 FREE_GAMES.md                 # 自动生成的活动页
 docs/SETUP.md                 # 完整部署步骤
 docs/FAQ.md                   # 常见问题与故障排查
+docs/ANDROID.md               # Android ntfy 配置教程
 SECURITY.md                   # 安全须知
 CONTRIBUTING.md               # 贡献指南
 LICENSE                       # MIT 开源协议
