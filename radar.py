@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""FreeGame Radar: Epic + Steam -> Bark. Python 3.11+, stdlib only."""
+"""FreeGame Radar: Epic + Steam -> Bark (iOS) and ntfy (Android)."""
 from __future__ import annotations
 
 import argparse
@@ -250,6 +250,57 @@ def bark_notify(url: str, title: str, message: str, jump_url: str) -> None:
         raise RuntimeError(f"Bark 推送失败（{type(exc).__name__}），请检查 Secret / 网络") from None
 
 
+def ntfy_notify(topic: str, title: str, message: str, jump_url: str) -> None:
+    """Send Android notifications using public ntfy.sh (no new server needed)."""
+    if not re.fullmatch(r"[A-Za-z0-9_-]{20,100}", topic):
+        raise ValueError("NTFY_TOPIC 应是至少 20 位的随机订阅主题，不能是 URL")
+    payload = json.dumps({
+        "topic": topic,
+        "title": title,
+        "message": message,
+        "priority": 3,
+        "click": jump_url,
+    }, ensure_ascii=False).encode("utf-8")
+    request = Request("https://ntfy.sh/", data=payload, method="POST",
+                      headers={"Content-Type": "application/json; charset=utf-8"})
+    try:
+        with urlopen(request, timeout=20) as response:
+            if not 200 <= response.status < 300:
+                raise RuntimeError("ntfy 返回非成功状态")
+    except (HTTPError, URLError, TimeoutError, OSError) as exc:
+        # Do not print the topic in logs: it acts as an access secret.
+        raise RuntimeError(f"ntfy 推送失败（{type(exc).__name__}）") from None
+
+
+def configured_channels() -> dict[str, str]:
+    """At least one push channel; secrets must be set in GitHub Actions."""
+    channels = {}
+    bark = os.environ.get("BARK_URL", "").strip()
+    ntfy = os.environ.get("NTFY_TOPIC", "").strip()
+    if bark:
+        channels["bark"] = bark
+    if ntfy:
+        channels["ntfy"] = ntfy
+    if not channels:
+        raise RuntimeError("请先设置 BARK_URL（iOS）或 NTFY_TOPIC（安卓）Secret")
+    return channels
+
+
+def was_sent(sent: dict[str, str], channel: str, game_id: str) -> bool:
+    """Old id-only state is treated as previous Bark deliveries."""
+    return f"{channel}:{game_id}" in sent or (channel == "bark" and game_id in sent)
+
+
+def send_to_channel(channel: str, endpoint: str, title: str,
+                    message: str, jump_url: str) -> None:
+    if channel == "bark":
+        bark_notify(endpoint, title, message, jump_url)
+    elif channel == "ntfy":
+        ntfy_notify(endpoint, title, message, jump_url)
+    else:
+        raise ValueError("未知通知渠道")
+
+
 def make_push_text(game: dict) -> tuple[str, str]:
     """Human-readable notification; do not assume unknown Steam timezone."""
     platform = game["platform"]
@@ -300,9 +351,7 @@ def markdown_games(games: list[dict], errors: list[str]) -> str:
 
 
 def scan() -> None:
-    bark_url = os.environ.get("BARK_URL", "").strip()
-    if not bark_url:
-        raise RuntimeError("尚未设置 Actions Secret：BARK_URL；取消扫描，避免丢失未推送状态")
+    channels = configured_channels()
     now = utc_now()
     games, warnings = collect_games(now)
     for warning in warnings:
@@ -312,20 +361,29 @@ def scan() -> None:
     sent = {key: value for key, value in sent.items()
             if (parse_date(value) or now) >= cutoff}
     limit = max(1, min(20, int(os.environ.get("MAX_PUSH", "8"))))
-    count = 0
+    counts = {channel: 0 for channel in channels}
+    failures = []
     for game in games:
-        if game["id"] in sent or count >= limit:
-            continue
         title, body = make_push_text(game)
-        bark_notify(bark_url, title, body, game["url"])
-        sent[game["id"]] = now.isoformat()
-        count += 1
-        print("已发送：", game["platform"], game["title"])
+        for channel, endpoint in channels.items():
+            if was_sent(sent, channel, game["id"]) or counts[channel] >= limit:
+                continue
+            try:
+                send_to_channel(channel, endpoint, title, body, game["url"])
+            except (RuntimeError, ValueError) as exc:
+                failures.append(f"{channel} 通知失败：{type(exc).__name__}")
+                print("警告：", channel, "未推送成功，稍后将重试")
+                continue
+            sent[f"{channel}:{game['id']}"] = now.isoformat()
+            counts[channel] += 1
+            print("已发送：", channel, game["platform"], game["title"])
     save_json(SENT_FILE, sent)
     save_json(CURRENT_FILE, games)
     OUTPUT_FILE.write_text(markdown_games(games, warnings), encoding="utf-8")
-    print(f"本次检索到 {len(games)} 个活动，推送 {count} 个，剩余待推送 "
-          f"{sum(g['id'] not in sent for g in games)} 个")
+    print(f"检索到 {len(games)} 个活动，成功通知：" +
+          ", ".join(f"{channel}={count}" for channel, count in counts.items()))
+    if failures:
+        print(f"本次有 {len(failures)} 项通知失败，下次扫描将重试。")
 
 
 def main() -> None:
@@ -333,13 +391,14 @@ def main() -> None:
     parser.add_argument("--test-push", action="store_true", help="仅测试 Bark")
     args = parser.parse_args()
     if args.test_push:
-        url = os.environ.get("BARK_URL", "").strip()
-        if not url:
-            raise RuntimeError("缺少 BARK_URL Secret")
-        bark_notify(url, "✅ FreeGame Radar 测试成功",
-                    "GitHub Actions 已连接 Bark！下一步可以手动运行 scan 模式。",
-                    "https://github.com/EpochTX/freegame")
-        print("测试通知已发送")
+        for channel, endpoint in configured_channels().items():
+            send_to_channel(
+                channel, endpoint,
+                "✅ FreeGame Radar 测试成功",
+                "GitHub Actions 推送已连接！可以手动运行 scan 模式。",
+                "https://github.com/EpochTX/freegame",
+            )
+            print(channel, "测试通知已发送")
     else:
         scan()
 
