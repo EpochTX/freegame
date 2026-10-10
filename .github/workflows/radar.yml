@@ -13,7 +13,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "运行模式（test=测试Bark，scan=扫描免费游戏）"
+        description: "运行模式（test=测试所有已配置推送，scan=扫描免费游戏）"
         required: true
         type: choice
         default: scan
@@ -44,16 +44,18 @@ jobs:
       - name: Offline tests
         run: python -m unittest discover -s tests -v
 
-      - name: Test Bark notification
+      - name: Test configured push channels
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.mode == 'test' }}
         env:
           BARK_URL: ${{ secrets.BARK_URL }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
         run: python radar.py --test-push
 
       - name: Scan free games and notify
         if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.mode != 'test') }}
         env:
           BARK_URL: ${{ secrets.BARK_URL }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
           EPIC_COUNTRY: ${{ vars.EPIC_COUNTRY || 'CN' }}
           EPIC_LOCALE: ${{ vars.EPIC_LOCALE || 'zh-CN' }}
           MAX_PUSH: ${{ vars.MAX_PUSH || '8' }}
