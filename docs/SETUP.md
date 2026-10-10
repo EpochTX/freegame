@@ -28,6 +28,8 @@
 
 请保持末尾完整结构即可；**不要**添加 `/title/body`，本项目使用 POST 发送标题和内容。
 
+**避免十分钟自动过期：** 请仅填写 `https://api.day.app/YOUR_DEVICE_KEY/`，**不要**直接粘贴 Bark 示例 GET 命令、`/title/body` 或 `?group=example&ttl=600`。本项目会自动清理这些常见误输入，但建议在 GitHub Secret 中更正源地址。推送 JSON 使用 `isArchive=1`，且**不传 `ttl`**，让消息交由 Bark 历史记录管理。
+
 **安全：** Key 是发通知用的私密凭证。不要在公开代码、Issue、README、Variables 或聊天截图中暴露。如果曾把实际 Key 发布给他人，建议先更换 Key，并在 GitHub Secret 中同步替换。
 
 ## 3. 测试 Bark
@@ -35,7 +37,7 @@
 1. 打开 [Actions → Free Games Radar](https://github.com/EpochTX/freegame/actions/workflows/radar.yml)（Fork 用户请切换到自己仓库的同名页面）。
 2. 点击 **Run workflow**。
 3. 将 `mode` 设为 `test` 后运行。
-4. 等 Actions 运行结束，确认手机收到「FreeGame Radar 测试成功」。
+4. 等 Actions 运行结束，确认手机收到「FreeGame Radar 测试成功」，标题应是实际发送的测试标题，不应是字面量 `title` / `body`。
 
 **如果显示绿色但没收到推送：** 检查手机通知权限、专注模式、Bark 设备状态；也检查是不是把旧 Key 放在 Secret 中。GitHub 成功仅代表 Bark API 接受了请求，不是 Apple 推送一定展示。
 
