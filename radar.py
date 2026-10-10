@@ -11,7 +11,7 @@ import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.error import HTTPError, URLError
-from urllib.parse import quote, urlencode, urlparse
+from urllib.parse import quote, urlencode, urlparse, urlsplit, urlunsplit
 from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parent
@@ -200,18 +200,42 @@ def save_json(path: Path, value) -> None:
             os.unlink(tmp)
 
 
+def normalize_bark_url(url: str) -> str:
+    """Remove GET-example placeholders and query settings from a Bark POST URL.
+
+    A copied example such as /KEY/title/body?group=example&ttl=600 can
+    override POST content and make history disappear after 10 minutes.
+    Never log the original URL: it contains the device key.
+    """
+    parsed = urlsplit(url.strip())
+    if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
+        raise ValueError("BARK_URL 必须是完整的 HTTPS 推送 URL")
+    segments = [part for part in parsed.path.split("/") if part]
+    if len(segments) >= 3 and segments[-2:] == ["title", "body"]:
+        segments = segments[:-2]
+    elif len(segments) >= 4 and segments[-3:] == ["title", "subtitle", "body"]:
+        segments = segments[:-3]
+    if not segments or segments[-1] == "push":
+        raise ValueError("请将 BARK_URL 设置为 /设备密钥/，不要使用 /push 或 curl 命令")
+    if parsed.hostname == "api.day.app" and len(segments) != 1:
+        raise ValueError("BARK_URL 应为 https://api.day.app/设备密钥/，不要附带 title/body")
+    # Remove ALL query parameters, especially ttl=600: a push should stay archived.
+    # group, title, body and the target page are sent separately in the JSON POST.
+    return urlunsplit((parsed.scheme, parsed.netloc, "/" + "/".join(segments), "", ""))
+
+
 def bark_notify(url: str, title: str, message: str, jump_url: str) -> None:
-    parsed = urlparse(url)
-    if parsed.scheme != "https" or not parsed.netloc or not parsed.path.strip("/"):
-        raise ValueError("BARK_URL 必须是 Bark App 给出的完整 HTTPS 推送 URL")
+    safe_endpoint = normalize_bark_url(url)
     payload = json.dumps({
         "title": title,
         "body": message,
         "group": "免费游戏雷达",
         "url": jump_url,
         "level": "active",
+        "isArchive": "1",
+        # Do not pass ttl: the user should control Bark history retention.
     }, ensure_ascii=False).encode("utf-8")
-    request = Request(url, data=payload, method="POST",
+    request = Request(safe_endpoint, data=payload, method="POST",
                       headers={"Content-Type": "application/json; charset=utf-8"})
     try:
         with urlopen(request, timeout=20) as response:
@@ -222,8 +246,28 @@ def bark_notify(url: str, title: str, message: str, jump_url: str) -> None:
             if isinstance(result, dict) and result.get("code", 200) not in (200,):
                 raise RuntimeError("Bark 返回业务错误")
     except (HTTPError, URLError, TimeoutError, OSError, ValueError) as exc:
-        # Do not print the URL: its path contains the secret Bark push key.
+        # Never log the request URL: it includes the secret Bark device key.
         raise RuntimeError(f"Bark 推送失败（{type(exc).__name__}），请检查 Secret / 网络") from None
+
+
+def make_push_text(game: dict) -> tuple[str, str]:
+    """Human-readable notification; do not assume unknown Steam timezone."""
+    platform = game["platform"]
+    name = str(game["title"]).strip()
+    title = f"🎁 {platform} 限免：{name[:65]}"
+    lines = [
+        f"游戏：{name}",
+        f"平台：{platform}",
+        "状态：可免费领取（请以活动页面实际显示为准）",
+    ]
+    end = parse_date(str(game.get("end") or ""))
+    if platform == "Epic" and end:
+        beijing = end.astimezone(timezone(timedelta(hours=8)))
+        lines.append("截止：北京时间 " + beijing.strftime("%m月%d日 %H:%M"))
+    else:
+        lines.append("截止：以活动页面为准")
+    lines.extend([game["note"], "👉 点击通知查看活动与领取方式"])
+    return title, "\n".join(lines)
 
 
 def markdown_games(games: list[dict], errors: list[str]) -> str:
@@ -272,10 +316,7 @@ def scan() -> None:
     for game in games:
         if game["id"] in sent or count >= limit:
             continue
-        title = "🎁 " + game["platform"] + " 限时免费：" + game["title"][:75]
-        body = game["note"]
-        if game.get("end"):
-            body += "\n结束时间（数据源原样）： " + str(game["end"])
+        title, body = make_push_text(game)
         bark_notify(bark_url, title, body, game["url"])
         sent[game["id"]] = now.isoformat()
         count += 1
