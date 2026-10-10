@@ -1,0 +1,111 @@
+# FreeGame Radar: auto-scan is enabled by default.
+# Default notifications: only configured Secrets produce messages.
+# If BARK_URL is deleted, Epic/Steam scanning continues and sends no Bark message.
+# Android ntfy stays disabled until you uncomment both NTFY_TOPIC lines.
+name: Free Games Radar
+
+on:
+  # push triggers offline unit tests only; no scan and no notification.
+  push:
+    branches: [main]
+    paths:
+      - 'radar.py'
+      - 'tests/**'
+      - '.github/workflows/radar.yml'
+  # UTC, every 6 hours (Beijing: 09:17 / 15:17 / 21:17 / 03:17)
+  schedule:
+    - cron: "17 1,7,13,19 * * *"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "scan=更新免费游戏列表；test=仅测试已配置推送"
+        required: true
+        type: choice
+        default: scan
+        options:
+          - scan
+          - test
+
+permissions:
+  contents: write
+
+concurrency:
+  group: freegame-radar
+  cancel-in-progress: false
+
+jobs:
+  radar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Offline tests
+        run: python -m unittest discover -s tests -v
+
+      - name: Test configured push channels
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.mode == 'test' }}
+        env:
+          BARK_URL: ${{ secrets.BARK_URL }}
+          # ================= Android / ntfy（默认关闭）=================
+          # 需要给安卓推送时：
+          # 1. 安卓安装 ntfy，订阅高随机度随机主题（服务器 ntfy.sh）
+          # 2. 仓库 Settings → Secrets and variables → Actions 中新建 NTFY_TOPIC
+          # 3. 删除下面 NTFY_TOPIC 这一行开头的 "# "（本文件有两处，都要取消）
+          # 注意：只保存 Secret、不取消注释，不会启用安卓推送。
+          # NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          # ===========================================================
+        run: python radar.py --test-push
+
+      - name: Scan free games and notify
+        if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.mode != 'test') }}
+        env:
+          BARK_URL: ${{ secrets.BARK_URL }}
+          # ================= Android / ntfy（默认关闭）=================
+          # 需要给安卓推送时：
+          # 1. 安卓安装 ntfy，订阅高随机度随机主题（服务器 ntfy.sh）
+          # 2. 仓库 Settings → Secrets and variables → Actions 中新建 NTFY_TOPIC
+          # 3. 删除下面 NTFY_TOPIC 这一行开头的 "# "（本文件有两处，都要取消）
+          # 注意：只保存 Secret、不取消注释，不会启用安卓推送。
+          # NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          # ===========================================================
+          EPIC_COUNTRY: ${{ vars.EPIC_COUNTRY || 'CN' }}
+          EPIC_LOCALE: ${{ vars.EPIC_LOCALE || 'zh-CN' }}
+          MAX_PUSH: ${{ vars.MAX_PUSH || '8' }}
+        run: python radar.py
+
+      - name: Commit updated state and game list
+        if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.mode != 'test') }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- data/sent.json data/current.json FREE_GAMES.md
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: refresh free game radar state [skip ci]"
+            # README or docs might change during a scan. Retry with a rebase
+            # instead of losing sent.json after Bark has already pushed.
+            for attempt in 1 2 3 4; do
+              if git push origin HEAD:main; then
+                echo "Updated notification state and activity list."
+                exit 0
+              fi
+              echo "Push conflict; fetching latest main and rebasing (attempt $attempt)."
+              git fetch origin main
+              if ! git rebase origin/main; then
+                echo "::error::State rebase conflict; no files were discarded."
+                git rebase --abort || true
+                exit 1
+              fi
+              sleep 2
+            done
+            echo "::error::Unable to save radar state after 4 retries."
+            exit 1
+          else
+            echo "No state changes to commit."
+          fi
