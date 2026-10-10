@@ -2,6 +2,23 @@
 
 > 本项目仅**发现并推送**免费游戏活动，**不会**自动登录或下单领取。支持 iPhone Bark 和安卓 ntfy，最快 5 分钟开始测试。
 
+> **⏸️ 注意：本仓库目前完全暂停运行。** 未注册活动的 GitHub Actions 工作流，也不会向 Bark/ntfy 发送消息。以下是未来使用者的自助启用教程，不代表仓库当前在运行。
+
+## 0. 恢复被注释的工作流（必须先做）
+
+为了确保默认不会自动运行，项目把工作流从 `.github/workflows/` 移到了 [`templates/radar.yml`](../templates/radar.yml)。**GitHub 不会执行 `templates/` 下的文件。**
+
+如需自行启用，Fork 本仓库后：
+
+1. 进入 `templates/radar.yml`，点击 GitHub 文件右上角的编辑（铅笔）按钮。
+2. 把文件路径由 `templates/radar.yml` 更改为 `.github/workflows/radar.yml`（也可以新建目标文件，复制模板完整内容，然后保留原模板）。
+3. 找到开头被注释的事件配置：`# on:`、`#   schedule:`、`#   workflow_dispatch:` 等。在整个触发器配置块（从 `# on:` 到 `#         - test`）中，每行前面的 `# ` **都要去掉**，变成有效 YAML。
+4. **只想手动运行**：先取消 `on:` 和 `workflow_dispatch:` 相关行的注释，保持 `schedule` 配置块为注释。**想每 6 小时自动运行**：两组事件都取消注释。
+5. 需要 iOS 通知就在 Secrets 设置 `BARK_URL`；需要安卓通知就设置 `NTFY_TOPIC` 并把任务里两行 `# NTFY_TOPIC:` 同时取消注释（见 [安卓说明](./ANDROID.md)）。
+6. 提交后 GitHub 才会把文件识别为工作流。进入 Actions 页面手动 `test` 验证。
+
+> **停用方式**：将 `.github/workflows/radar.yml` 再移出工作流目录（放回 `templates/radar.yml`）或删除活动工作流文件。仅删 Secret 可能使任务继续触发但失败，不等于停用。
+
 ## 准备工作
 
 - GitHub 账号和可以编辑的仓库（本项目：[EpochTX/freegame](https://github.com/EpochTX/freegame)）。
@@ -12,9 +29,9 @@
 
 ## 1. Fork 或使用现有仓库
 
-**新部署**：Fork [EpochTX/freegame](https://github.com/EpochTX/freegame) 到自己的账户。Fork 后请确认 GitHub 允许该 Fork 运行 Actions。
+**新部署**：Fork [EpochTX/freegame](https://github.com/EpochTX/freegame) 到自己的账户，然后按上面的第 0 步手动恢复工作流。Fork 后工作流默认不存在，不会自动运行。
 
-**当前仓库维护者**：无需 Fork，直接使用已有的 `main` 分支。
+**仓库维护者**：不需要 Fork；本仓库当前仍保持完全暂停状态，不必做任何操作。
 
 ## 2. 设置推送 Secret（任选 Bark 或 ntfy，也可以都设置）
 
@@ -36,9 +53,9 @@
 
 **安全：** Key 是发通知用的私密凭证。不要在公开代码、Issue、README、Variables 或聊天截图中暴露。如果曾把实际 Key 发布给他人，建议先更换 Key，并在 GitHub Secret 中同步替换。
 
-## 3. 测试 Bark
+## 3. 启用工作流后的推送测试
 
-1. 打开 [Actions → Free Games Radar](https://github.com/EpochTX/freegame/actions/workflows/radar.yml)（Fork 用户请切换到自己仓库的同名页面）。
+1. 确保第 0 步已经完成；打开**你自己仓库**的 Actions → Free Games Radar。尚未恢复工作流时，这个入口不会出现。
 2. 点击 **Run workflow**。
 3. 将 `mode` 设为 `test` 后运行。
 4. 等 Actions 运行结束，确认所有已配置的手机都收到「FreeGame Radar 测试成功」，标题应是实际发送的测试标题，不应是字面量 `title` / `body`。
@@ -73,7 +90,7 @@
 
 ## 6. 自动运行与修改频率
 
-工作流文件：[`.github/workflows/radar.yml`](../.github/workflows/radar.yml)
+当前停用模板：[`templates/radar.yml`](../templates/radar.yml)。**不在 `.github/workflows/` 中就不会执行。**
 
 默认配置：
 
@@ -82,7 +99,7 @@ schedule:
   - cron: "17 1,7,13,19 * * *"
 ```
 
-每 6 小时扫描一次，北京时间约 09:17、15:17、21:17、次日 03:17。
+**只有正式启用后**，才会每 6 小时扫描一次，北京时间约 09:17、15:17、21:17、次日 03:17。目前没有自动扫描。
 
 希望每天 10:00 左右检查一次，可以改为：
 
@@ -112,7 +129,8 @@ python radar.py              # 正式扫描
 
 ## 8. 检查运行与故障
 
-- **Actions 页面**可以查看脚本执行成功或失败。
+- **当前仓库没新的 Actions 运行：** 这是正常的，工作流已移到 `templates/` 且事件块有 `#` 注释。
+- **启用后**：在 Actions 页面可查看运行成功或失败。
 - **绿色通过但没有游戏提醒：** 可能没有新游戏，或者已有去重记录。
 - **未设置推送 Secret：** 至少需要 `BARK_URL` 或 `NTFY_TOPIC` 之一；注意 Secret 所属仓库。
 - **Bark 推送失败：** 检查推送 Key 是否已过期及联网情况。
