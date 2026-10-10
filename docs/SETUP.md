@@ -1,148 +1,93 @@
-# 🚀 详细部署教程
+# 🚀 FreeGame Radar：部署与配置
 
-> 本项目仅**发现并推送**免费游戏活动，**不会**自动登录或下单领取。支持 iPhone Bark 和安卓 ntfy，最快 5 分钟开始测试。
+无需自建服务器或游戏账号登录信息。项目使用 GitHub Actions 定时生成 [免费游戏清单](../FREE_GAMES.md)，手机通知完全可选。
 
-> **⏸️ 注意：本仓库目前完全暂停运行。** 未注册活动的 GitHub Actions 工作流，也不会向 Bark/ntfy 发送消息。以下是未来使用者的自助启用教程，不代表仓库当前在运行。
+## 一、启用免费扫描
 
-## 0. 恢复被注释的工作流（必须先做）
+1. Fork [EpochTX/freegame](https://github.com/EpochTX/freegame) 到自己的 GitHub 账号。
+2. 确认仓库存在 [`.github/workflows/radar.yml`](../.github/workflows/radar.yml)。
+3. 如 GitHub 对 Fork 禁用了 Actions，请在仓库 **Actions** 页面手动启用。
+4. 运行 **Actions → Free Games Radar → Run workflow → mode: scan**。
+5. 查看运行日志，并打开 [`FREE_GAMES.md`](../FREE_GAMES.md) 检查是否更新。
 
-为了确保默认不会自动运行，项目把工作流从 `.github/workflows/` 移到了 [`templates/radar.yml`](../templates/radar.yml)。**GitHub 不会执行 `templates/` 下的文件。**
+**没有推送密钥也完全可以使用。** 脚本会正常抓取、过滤、更新活动清单，且不会发送任何手机通知。
 
-如需自行启用，Fork 本仓库后：
+## 二、可选：iOS / iPadOS Bark 推送
 
-1. 进入 `templates/radar.yml`，点击 GitHub 文件右上角的编辑（铅笔）按钮。
-2. 把文件路径由 `templates/radar.yml` 更改为 `.github/workflows/radar.yml`（也可以新建目标文件，复制模板完整内容，然后保留原模板）。
-3. 找到开头被注释的事件配置：`# on:`、`#   schedule:`、`#   workflow_dispatch:` 等。在整个触发器配置块（从 `# on:` 到 `#         - test`）中，每行前面的 `# ` **都要去掉**，变成有效 YAML。
-4. **只想手动运行**：先取消 `on:` 和 `workflow_dispatch:` 相关行的注释，保持 `schedule` 配置块为注释。**想每 6 小时自动运行**：两组事件都取消注释。
-5. 需要 iOS 通知就在 Secrets 设置 `BARK_URL`；需要安卓通知就设置 `NTFY_TOPIC` 并把任务里两行 `# NTFY_TOPIC:` 同时取消注释（见 [安卓说明](./ANDROID.md)）。
-6. 提交后 GitHub 才会把文件识别为工作流。进入 Actions 页面手动 `test` 验证。
+希望收到游戏通知时再配置。
 
-> **停用方式**：将 `.github/workflows/radar.yml` 再移出工作流目录（放回 `templates/radar.yml`）或删除活动工作流文件。仅删 Secret 可能使任务继续触发但失败，不等于停用。
-
-## 准备工作
-
-- GitHub 账号和可以编辑的仓库（本项目：[EpochTX/freegame](https://github.com/EpochTX/freegame)）。
-- iPhone：安装 [Bark](https://github.com/Finb/Bark)，允许通知，获取推送 URL。
-- 安卓：安装 [ntfy](https://docs.ntfy.sh/subscribe/phone/)，并订阅随机主题；具体见 [安卓接入指南](./ANDROID.md)。
-- **只需任选一种推送方式，也可以同时使用两种。**
-- 无需 GitHub 付费订阅、VPS、游戏账户密码或额外 API Key。具体 GitHub Actions 免费额度以 GitHub 官方规则为准。
-
-## 1. Fork 或使用现有仓库
-
-**新部署**：Fork [EpochTX/freegame](https://github.com/EpochTX/freegame) 到自己的账户，然后按上面的第 0 步手动恢复工作流。Fork 后工作流默认不存在，不会自动运行。
-
-**仓库维护者**：不需要 Fork；本仓库当前仍保持完全暂停状态，不必做任何操作。
-
-## 2. 设置推送 Secret（任选 Bark 或 ntfy，也可以都设置）
-
-1. 在你自己的仓库中打开 **Settings**。
-2. 左侧点击 **Secrets and variables → Actions**。
-3. 点击 **New repository secret**。
-4. Name 填 `BARK_URL`。
-5. Secret 填入 Bark App 提供的完整 HTTPS URL，例如：
+1. 安装 [Bark](https://github.com/Finb/Bark)，允许手机通知。
+2. 复制 Bark App 中的**完整 HTTPS 推送 URL**，其格式为：
    ```text
    https://api.day.app/YOUR_DEVICE_KEY/
    ```
-6. 保存。
+3. 前往自己的 GitHub 仓库 **Settings → Secrets and variables → Actions → New repository secret**。
+4. Name 填 `BARK_URL`，Secret 填完整 URL。
+5. 打开 Actions → Free Games Radar → Run workflow，选择 `test` 测试。
 
-请保持末尾完整结构即可；**不要**添加 `/title/body`，本项目使用 POST 发送标题和内容。
+**关闭 Bark 通知而保留免费扫描：** 删除仓库的 `BARK_URL` Secret 即可。若没有配置安卓 ntfy，就不会有任何手机推送。
 
-安卓：创建一个至少 20 字符的**随机主题**，在 GitHub Secrets 中添加 `NTFY_TOPIC`，值为主题名（不是 URL），并在 ntfy App 中订阅。详细步骤：[安卓推送指南](./ANDROID.md)。**公共 ntfy.sh 主题默认公开，知道主题名的人可能订阅或发送消息。**
+注意：请勿复制整段 `curl` 命令；Bark 示例路径的 `/title/body` 和 `?ttl=600` 也不要填入 Secret。脚本会清理常见示例参数，以真正的游戏信息发送 JSON POST，并使用存档设置，不主动指定短期 TTL。
 
-**避免十分钟自动过期：** 请仅填写 `https://api.day.app/YOUR_DEVICE_KEY/`，**不要**直接粘贴 Bark 示例 GET 命令、`/title/body` 或 `?group=example&ttl=600`。本项目会自动清理这些常见误输入，但建议在 GitHub Secret 中更正源地址。推送 JSON 使用 `isArchive=1`，且**不传 `ttl`**，让消息交由 Bark 历史记录管理。
+## 三、可选：Android ntfy 推送
 
-**安全：** Key 是发通知用的私密凭证。不要在公开代码、Issue、README、Variables 或聊天截图中暴露。如果曾把实际 Key 发布给他人，建议先更换 Key，并在 GitHub Secret 中同步替换。
+参见 [Android ntfy 详细教程](./ANDROID.md)。概括为：
 
-## 3. 启用工作流后的推送测试
+1. 在安卓安装 ntfy App，并订阅高随机度主题。
+2. 在仓库 Secrets 新增 `NTFY_TOPIC`，填入主题名，不包含 URL。
+3. 编辑 [`.github/workflows/radar.yml`](../.github/workflows/radar.yml)。
+4. 在测试任务和扫描任务中，分别取消一行 `# NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}` 前的 `# `，**共两处**。
+5. 运行 `test` 检查安卓通知。
 
-1. 确保第 0 步已经完成；打开**你自己仓库**的 Actions → Free Games Radar。尚未恢复工作流时，这个入口不会出现。
-2. 点击 **Run workflow**。
-3. 将 `mode` 设为 `test` 后运行。
-4. 等 Actions 运行结束，确认所有已配置的手机都收到「FreeGame Radar 测试成功」，标题应是实际发送的测试标题，不应是字面量 `title` / `body`。
+无需同时安装 Bark 和 ntfy；也可双端使用。公共 ntfy 主题默认没有访问控制，请勿发送隐私信息。
 
-**如果显示绿色但没收到推送：** 检查手机通知权限、专注模式、Bark 设备状态；也检查是不是把旧 Key 放在 Secret 中。GitHub 成功仅代表 Bark API 接受了请求，不是 Apple 推送一定展示。
+## 四、运行模式
 
-## 4. 手动扫描游戏
+**手动运行：** GitHub → Actions → Free Games Radar → Run workflow。
 
-在同一页面再次选择 **Run workflow** → `scan`。
+| mode | 说明 |
+| --- | --- |
+| `scan` | 立即检查限免活动，更新清单；已配置通知通道时只推送新活动 |
+| `test` | 仅发送测试通知；无推送密钥时正常跳过 |
 
-- 检测 Epic 官方公开促销数据。
-- 检测 GamerPower 列出的 Steam 免费完整游戏活动。
-- 过滤大部分常见试玩、DLC、道具活动。
-- 向各自**尚未通知**的设备推送新活动；每个通道按活动 ID、游戏名分别去重；相同游戏 45 天内尽量不重复提醒。
-- 更新仓库里的 `FREE_GAMES.md`、`data/current.json`、`data/sent.json`。
+**定时运行：** 每 6 小时扫描一次，配置位于 [工作流](../.github/workflows/radar.yml)。时间为 UTC 01:17、07:17、13:17、19:17，换算为北京时间 09:17、15:17、21:17、次日 03:17。
 
-如果本次没有新活动，**不会**强制发送「一切正常」通知。可以看 [当前活动清单](../FREE_GAMES.md)。
+GitHub 定时触发可能延迟。提交代码导致的 `push` 事件只运行离线测试，不进行游戏扫描或推送。
 
-## 5. 可选：切换 Epic 地区
+## 五、可选变量
 
-想看其他地区，例如美国，请进入：
+GitHub **Settings → Secrets and variables → Actions → Variables**：
 
-**Settings → Secrets and variables → Actions → Variables → New repository variable**
-
-| 名称 | 示例 | 默认 |
+| Variable | 默认值 | 说明 |
 | --- | --- | --- |
-| `EPIC_COUNTRY` | `US` | `CN` |
-| `EPIC_LOCALE` | `en-US` | `zh-CN` |
-| `MAX_PUSH` | `5` | `8` |
+| `EPIC_COUNTRY` | `CN` | Epic 查询地区，如 `US` |
+| `EPIC_LOCALE` | `zh-CN` | Epic 语言，如 `en-US` |
+| `MAX_PUSH` | `8` | 每通道每次推送数量上限（1–20） |
 
-请注意 Epic 的商城页面、账号实际地区和网络访问地区可能影响可领取资格。
+以上属于非敏感配置，可放在 Variables。真实 Bark URL 和 ntfy 随机主题仍应使用 Secrets。
 
-## 6. 自动运行与修改频率
+## 六、本地测试
 
-当前停用模板：[`templates/radar.yml`](../templates/radar.yml)。**不在 `.github/workflows/` 中就不会执行。**
-
-默认配置：
-
-```yaml
-schedule:
-  - cron: "17 1,7,13,19 * * *"
-```
-
-**只有正式启用后**，才会每 6 小时扫描一次，北京时间约 09:17、15:17、21:17、次日 03:17。目前没有自动扫描。
-
-希望每天 10:00 左右检查一次，可以改为：
-
-```yaml
-schedule:
-  - cron: "0 2 * * *"
-```
-
-因为 GitHub 使用 UTC，且工作流可能晚于预定时间执行，所以这是**大致时刻**而非秒级计划任务。
-
-## 7. 本地调试（可选）
-
-Python 3.11+：
+需要 Python 3.11+，无需安装额外 Python 依赖：
 
 ```bash
 python -m unittest discover -s tests -v
+python radar.py
 ```
 
-在你的终端环境设置好 `BARK_URL` 后：
+不设置任何推送环境变量时，第二个命令只会更新本地清单文件，不会通知手机。要测试通知，请先通过环境变量安全提供个人密钥，再运行 `python radar.py --test-push`，避免将密钥写入脚本或上传到仓库。
 
-```bash
-python radar.py --test-push  # 只验证通知
-python radar.py              # 正式扫描
-```
+## 七、排错
 
-代码不需要额外 pip 包。Windows PowerShell 可用 `$env:BARK_URL="你的推送 URL"` 临时设置环境变量；不要把它写进提交的脚本。
+- **扫描成功，没有推送：** 如果未配置 `BARK_URL` / `NTFY_TOPIC`，属于预期行为。
+- **有推送 Secret 但没收到：** 用 `test` 模式检查应用通知权限、Secret 名称与地址是否正确。
+- **安卓未推送：** 检查工作流的两处 ntfy 变量是否已经取消注释。
+- **清单没有更新：** 检查 Epic / GamerPower 数据源连接与 Actions 扫描日志。
+- **状态无法保存：** 检查仓库对 GitHub Actions 的 `contents: write` 权限与 `main` 分支保护。
+- **偶有重复提醒：** 推送成功后状态提交未完成时，仍可能再次发送。系统按活动 ID 与同游戏 45 天冷却期尽量减少重复。
 
-## 8. 检查运行与故障
+## 安全提示
 
-- **当前仓库没新的 Actions 运行：** 这是正常的，工作流已移到 `templates/` 且事件块有 `#` 注释。
-- **启用后**：在 Actions 页面可查看运行成功或失败。
-- **绿色通过但没有游戏提醒：** 可能没有新游戏，或者已有去重记录。
-- **未设置推送 Secret：** 至少需要 `BARK_URL` 或 `NTFY_TOPIC` 之一；注意 Secret 所属仓库。
-- **Bark 推送失败：** 检查推送 Key 是否已过期及联网情况。
-- **ntfy 无法送达：** 核对 App 主题和 `NTFY_TOPIC`、安卓通知权限、后台电池限制、`ntfy.sh` 访问是否畅通。
-- **偶尔重复提醒：** 以前更新仓库文档时可能导致状态提交冲突，现已增加重试提交、按通道分离和 45 天同游戏指纹；若任务中断在「通知已发、状态尚未提交」之间仍可能重复。
-- **扫描数据失败：** 上游 API 可能暂时不可用，重试或参考 [FAQ](./FAQ.md)。
-- **状态提交失败：** 确认 Action 工作流中的 `permissions: contents: write` 可用，并检查仓库是否启用了阻止 Bot 推送的分支保护。
-- **公开仓库停用定时任务：** GitHub 可能在长时间无活动后停用 schedule，需要重新启用。
+本项目不需要 Epic / Steam 账号密码、浏览器 Cookie、短信验证码或游戏登录 Token。不要在仓库、Issue、PR、公开日志中上传真实密钥；任何泄露的密钥都应在服务提供方轮换。
 
-## 进一步阅读
-
-- [项目首页](../README.md)
-- [常见问题](./FAQ.md)
-- [安全须知](../SECURITY.md)
-- [仓库介绍文案和 Topics 建议](./REPOSITORY.md)
+[← 返回 README](../README.md) · [FAQ](./FAQ.md) · [安全说明](../SECURITY.md)
