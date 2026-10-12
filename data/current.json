@@ -30,25 +30,5 @@
     "note": "GamerPower 第三方活动；可能需领码、额外账号或满足地区条件。",
     "added_at": "2026-10-10T13:37:45+00:00",
     "status": "active"
-  },
-  {
-    "id": "steam:gamerpower:3810",
-    "platform": "Steam",
-    "title": "Fireside Feelings (Steam) Giveaway",
-    "url": "https://www.gamerpower.com/open/fireside-feelings-steam-giveaway",
-    "end": "2026-10-12 23:59:00",
-    "note": "GamerPower 第三方活动；可能需领码、额外账号或满足地区条件。",
-    "added_at": "2026-10-10T13:37:45+00:00",
-    "status": "active"
-  },
-  {
-    "id": "steam:gamerpower:3809",
-    "platform": "Steam",
-    "title": "Pony Island (Steam) Giveaway",
-    "url": "https://www.gamerpower.com/open/pony-island-steam-giveaway",
-    "end": "2026-10-12 23:59:00",
-    "note": "GamerPower 第三方活动；可能需领码、额外账号或满足地区条件。",
-    "added_at": "2026-10-10T13:37:45+00:00",
-    "status": "active"
   }
 ]
