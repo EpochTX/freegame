@@ -1,24 +1,24 @@
 [
   {
-    "id": "epic:af6b823b8698465f9aedc3bddf2e8686:2026-10-08",
+    "id": "epic:db1202a30c5541dd99cdf54c918a9348:2026-10-15",
     "platform": "Epic",
-    "title": "TerraScape",
-    "url": "https://store.epicgames.com/zh-CN/p/terrascape-2b12b1",
-    "start": "2026-10-08T15:00:00+00:00",
-    "end": "2026-10-15T15:00:00+00:00",
+    "title": "Agent A - 伪装游戏",
+    "url": "https://store.epicgames.com/zh-CN/p/agent-a-a-puzzle-in-disguise-42fe5f",
+    "start": "2026-10-15T15:00:00+00:00",
+    "end": "2026-10-22T15:00:00+00:00",
     "note": "Epic 官方限时免费；领取时请核对账号所在地区。",
-    "added_at": "2026-10-10T13:37:45+00:00",
+    "added_at": "2026-10-15T17:46:17.460343+00:00",
     "status": "active"
   },
   {
-    "id": "epic:cb733f3432db46bca94965b422c33ede:2026-10-08",
+    "id": "epic:6a846880836044a2adad614ac771f487:2026-10-15",
     "platform": "Epic",
-    "title": "虎视眈眈 (Out of Sight)",
-    "url": "https://store.epicgames.com/zh-CN/p/out-of-sight-b96ca8",
-    "start": "2026-10-08T15:00:00+00:00",
-    "end": "2026-10-15T15:00:00+00:00",
+    "title": "Bad Cheese",
+    "url": "https://store.epicgames.com/zh-CN/p/bad-cheese-4256d9",
+    "start": "2026-10-15T15:00:00+00:00",
+    "end": "2026-10-22T15:00:00+00:00",
     "note": "Epic 官方限时免费；领取时请核对账号所在地区。",
-    "added_at": "2026-10-10T13:37:45+00:00",
+    "added_at": "2026-10-15T17:46:17.460343+00:00",
     "status": "active"
   },
   {
